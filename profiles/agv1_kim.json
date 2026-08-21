@@ -1,4 +1,4 @@
-    {
+{
   "_agv_id": "agv1_kim",
   "_description": "AGV1 KIM2A — primary unit",
 
@@ -34,7 +34,6 @@
   },
 
   "motor_channels": {
-    "_comment": "DO and AO channel indices for each motor drive",
     "left":  { "do_fwd": 0, "do_rev": 1, "do_brake": 2, "do_alarm": 888, "ao_speed": 0 },
     "right": { "do_fwd": 3, "do_rev": 4, "do_brake": 5, "do_alarm": 888, "ao_speed": 1 }
   },
@@ -57,29 +56,29 @@
   },
 
   "speeds": {
-    "MANUAL_TARGET_HIGH_SPEED": 0.3,
-    "MANUAL_TARGET_SLOW_SPEED": 0.2,
-    "AUTO_TARGET_HIGH_SPEED": 0.32,
+    "MANUAL_TARGET_HIGH_SPEED": 1,
+    "MANUAL_TARGET_SLOW_SPEED": 0.5,
+    "AUTO_TARGET_HIGH_SPEED": 0.8,
     "AUTO_TARGET_SLOW_SPEED": 0.18,
     "AUTO_TARGET_APPROACH_SPEED": 0.18,
     "ACCEL_RATE": 0.5,
-    "DECEL_RATE": 0.5, 
+    "DECEL_RATE": 3,
     "APPROACH_DECEL_RATE": 0.4
   },
 
   "pid_tuning": {
-    "_comment_high": "HIGH gains",
-    "KP": 2.8,
-    "TD": 0.26,
+    "_comment_high": "HIGH gains — retuned for 0.6 m/s (was 0.32 m/s: KP=2.8, TD=0.26, V_RED_COEF=2.8, clamp=1000). Start point only — verify on the physical track and adjust.",
+    "KP": 2.3,
+    "TD": 0.30,
     "N": 20,
     "_comment_slow": "SLOW/corner gains",
     "KP_SLOW": 2.6,
     "TD_SLOW": 0.16,
     "N_SLOW": 12,
-    "_comment_approach": "APPROACH gains — 0.2 m/s station crawl.The approach is guided by a one-sided physical bar on the AGV's RIGHT; tape is straight here so the PID needs little authority. Asymmetric clamp: INTO_BAR (positive output = yaw right into the bar) held tight at 8 rpm so the bar centers the AGV mechanically instead of the PID over-pressing the bearings; AWAY (off the bar) kept at 80 rpm for recovery. INTO_BAR is the tuning dial — lower toward 0 if it still binds, raise if it drifts left off the bar.",
+    "_comment_approach": "APPROACH gains — 0.2 m/s station crawl. The approach is guided by a one-sided physical bar on the AGV's RIGHT; tape is straight here so the PID needs little authority. Asymmetric clamp: INTO_BAR (positive output = yaw right into the bar) held tight at 8 rpm so the bar centers the AGV mechanically instead of the PID over-pressing the bearings; AWAY (off the bar) kept at 80 rpm for recovery. INTO_BAR is the tuning dial — lower toward 0 if it still binds, raise if it drifts left off the bar.",
     "KP_APPROACH": 0.45,
     "TD_APPROACH": 0.2,
-    "N_APPROACH": 10  ,
+    "N_APPROACH": 10,
     "OUTPUT_CLAMP_INTO_BAR_APPROACH": 8,
     "OUTPUT_CLAMP_AWAY_APPROACH": 80,
     "_comment_shared": "Shared — integral and timing constants. TI/deadband lowered to null corner standing bias faster at higher speed.",
@@ -88,10 +87,10 @@
     "TI_MAX": 400,
     "DT": 0.01,
     "_comment_sr": "Speed reduction coefficients — split by speed mode",
-    "V_RED_COEF": 2.8,
+    "V_RED_COEF": 3.6,
     "V_RED_COEF_SLOW": 2.0,
     "V_RED_COEF_APPROACH": 0.4,
-    "OUTPUT_CLAMP_RPM": 1000  ,
+    "OUTPUT_CLAMP_RPM": 1300,
     "SR_ALPHA": 0.15,
     "SR_CAP": 0.45
   },
@@ -180,10 +179,10 @@
       "requires_mode": "running"
     },
     {
-      "_comment": "Fork before the seq-1 station — follow the RIGHT track through the branch. Tag placeholder: replace 00AA with the scanned tag.",
-      "name": "fork_right_to_seq1",
+      "_comment": "Fork ke titik 1 — hanya jalan kalau operator pilih target ini di HMI homepost. Tag placeholder: replace 00AA with the scanned tag.",
+      "name": "fork_to_point1",
       "category": "navigation",
-      "trigger": { "type": "rfid", "rfid_tag": "00AA" },
+      "trigger": { "type": "rfid", "rfid_tag": "00AA", "requires_target": "point_1" },
       "actions": [
         { "type": "set_track", "side": "right" }
       ],
@@ -191,7 +190,51 @@
       "requires_mode": "running"
     },
     {
-      "_comment": "After the merge back onto the main loop — revert to the default LEFT track. Tag placeholder: replace 00BB with the scanned tag.",
+      "_comment": "Fork ke titik 2. Tag placeholder: replace 00AB with the scanned tag.",
+      "name": "fork_to_point2",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AB", "requires_target": "point_2" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 3. Tag placeholder: replace 00AC with the scanned tag.",
+      "name": "fork_to_point3",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AC", "requires_target": "point_3" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 4. Tag placeholder: replace 00AD with the scanned tag.",
+      "name": "fork_to_point4",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AD", "requires_target": "point_4" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 5. Tag placeholder: replace 00AE with the scanned tag.",
+      "name": "fork_to_point5",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AE", "requires_target": "point_5" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "After the merge back onto the main loop — revert to the default LEFT track. No requires_target: always runs regardless of which point was selected. Tag placeholder: replace 00BB with the scanned tag.",
       "name": "fork_merge_revert",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00BB" },

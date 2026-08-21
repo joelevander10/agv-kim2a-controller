@@ -663,6 +663,23 @@
   </div>
 </div>
 
+<!-- Fork target selection panel -->
+<div id="fork-target-panel" class="raised">
+  <span class="ctrl-label">Pilih Cabang:</span>
+  <select id="fork-target-select">
+    <option value="null">— BELUM DIPILIH —</option>
+    <option value="point_1">CABANG 1</option>
+    <option value="point_2">CABANG 2</option>
+    <option value="point_3">CABANG 3</option>
+    <option value="point_4">CABANG 4</option>
+    <option value="point_5">CABANG 5</option>
+  </select>
+  <button id="btn-fork-set">SET</button>
+  <span id="fork-target-status"></span>
+  <span class="drive-label" style="margin-left:20px;">CABANG AKTIF:</span>
+  <span class="drive-value" id="fork-target-display">—</span>
+</div>
+
 
 <!-- Sequence engine status panel -->
 <div id="seq-status-panel" class="raised">
@@ -863,6 +880,12 @@ function fetchState() {
       trackEl.textContent = track.toUpperCase();
       trackEl.style.color = track === 'right' ? '#a05000' : '#000080';
 
+      // Operator-selected fork destination (HMI at homepost)
+      const forkTargetEl = document.getElementById('fork-target-display');
+      const forkTarget = agv.selected_fork_target;
+      const forkLabel  = forkTarget ? 'CABANG ' + forkTarget.replace('point_', '') : '—';
+      forkTargetEl.textContent = forkLabel;
+
       document.getElementById('ts').textContent = new Date().toLocaleTimeString();
     })
     .catch(() => {
@@ -883,7 +906,28 @@ document.getElementById('btn-set').addEventListener('click', () => {
     const st = document.getElementById('ctrl-status');
     st.style.color = d.ok ? '#006000' : '#c00000';
     st.textContent  = d.ok
-      ? (d.sequence !== null ? `SET → SEQ ${d.sequence}` : 'CLEARED')
+      ? (d.sequence !== null
+          ? `SET → SEQ ${d.sequence}` + (d.fork_target ? ` (CABANG ${d.sequence + 1})` : '')
+          : 'CLEARED')
+      : (d.error || 'ERROR');
+    setTimeout(() => { st.textContent = ''; }, 4000);
+  });
+});
+
+document.getElementById('btn-fork-set').addEventListener('click', () => {
+  const val    = document.getElementById('fork-target-select').value;
+  const target = val === 'null' ? null : val;
+  fetch('/api/fork_target', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target })
+  })
+  .then(r => r.json())
+  .then(d => {
+    const st = document.getElementById('fork-target-status');
+    st.style.color = d.ok ? '#006000' : '#c00000';
+    st.textContent  = d.ok
+      ? (d.target ? `SET → CABANG ${d.target.replace('point_', '')}` : 'DIBATALKAN')
       : (d.error || 'ERROR');
     setTimeout(() => { st.textContent = ''; }, 4000);
   });

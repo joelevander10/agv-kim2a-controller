@@ -408,6 +408,11 @@ async def mode_manager(state, engine=None, manager=None):
         state.track_follow        = "left"
         state.pending_sequence    = None
         state.calibration_request = False
+        # selected_fork_target is intentionally NOT reset here — it's the
+        # operator's chosen destination from the homepost HMI and should
+        # survive a RESET/EMERGENCY/mode-switch so the operator doesn't have
+        # to re-pick it every time the AGV briefly stops. It only changes when
+        # the operator explicitly sets a new one (or clears it) from the HMI.
         if engine is not None:
             engine.cancel_armed()
 

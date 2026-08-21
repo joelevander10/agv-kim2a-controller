@@ -31,6 +31,11 @@ class KinematicState:
         self.web_btn_reset        = False   # momentary; mode_manager clears after detecting rising edge
         self.web_btn_manual       = False   # level signal: True = MANUAL, False = AUTO
         self.web_btn_emergency    = False   # level signal: True = emergency active
+        # Operator-selected fork destination (HMI at homepost). Tags scanned at
+        # every fork point are matched against this before their action runs —
+        # see rfid_processor.py. None = no target chosen; all fork_* sequences
+        # with a requires_target are ignored until the operator picks one.
+        self.selected_fork_target = None
 
 
 class PerceptionState:
@@ -225,6 +230,11 @@ class AMRState:
     def web_btn_emergency(self): return self.kinematic.web_btn_emergency
     @web_btn_emergency.setter
     def web_btn_emergency(self, v): self.kinematic.web_btn_emergency = v
+
+    @property
+    def selected_fork_target(self): return self.kinematic.selected_fork_target
+    @selected_fork_target.setter
+    def selected_fork_target(self, v): self.kinematic.selected_fork_target = v
 
     # ── PerceptionState shims ─────────────────────────────────────────────────
 

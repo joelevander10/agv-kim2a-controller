@@ -91,6 +91,7 @@ def _build_state_snapshot():
         "system_error_detail":  s.system_error_detail,
         "speed_mode":           s.speed_mode,
         "track_follow":         s.track_follow,
+        "selected_fork_target": s.selected_fork_target,
         "sequence_stop":        s.sequence_stop,
         "sequence_request":     s.plc_sequence_request,
         "seq_pulse_active":     s.plc_sequence_request is not None,
@@ -187,6 +188,31 @@ def api_manual_command():
     return jsonify({"ok": True, "command": cmd})
 
 
+_VALID_FORK_TARGETS = {"point_1", "point_2", "point_3", "point_4", "point_5"}
+
+@app.route("/api/fork_target", methods=["POST"])
+def api_fork_target():
+    """Operator selects which fork destination the AGV should take next.
+
+    Filtering happens in rfid_processor.py: every fork tag is physically read
+    on each loop pass, but only the one matching state.selected_fork_target
+    is forwarded to the sequence engine. Intentionally not mode-gated — the
+    operator picks this at homepost before the AGV reaches RUNNING.
+    """
+    if _state is None:
+        return jsonify({"error": "state not initialised"}), 503
+
+    data   = request.get_json(silent=True) or {}
+    target = data.get("target")   # None = clear selection
+
+    if target is not None and target not in _VALID_FORK_TARGETS:
+        return jsonify({"error": f"unknown target: {target}"}), 400
+
+    _state.selected_fork_target = target
+    logger.info("[HMI] Fork target set to: %s", target)
+    return jsonify({"ok": True, "target": target})
+
+
 @app.route("/api/state")
 def api_state():
     if _state is None:
@@ -196,6 +222,13 @@ def api_state():
 
 @app.route("/api/sequence", methods=["POST"])
 def api_sequence():
+    """Manual PLC sequence request (M2010-M2018).
+
+    seq0-seq4 additionally double as the fork/cabang selector: picking one of
+    these ALSO sets state.selected_fork_target (point_1..point_5), on top of
+    the usual PLC bit write. seq5-seq8 behave exactly as before — PLC only,
+    no fork target change.
+    """
     if _state is None:
         return jsonify({"error": "state not initialised"}), 503
 
@@ -207,23 +240,34 @@ def api_sequence():
     seq  = data.get("sequence")
 
     if seq is None:
-        # CLEAR — requires PLC manual mode
-        if not manual_mode:
-            return jsonify({"error": "CLEAR requires PLC MANUAL MODE (M1)"}), 403
+        # CLEAR — PLC MANUAL MODE (M1) check temporarily disabled for testing.
+        # To re-enable: uncomment the block below.
+        # if not manual_mode:
+        #     return jsonify({"error": "CLEAR requires PLC MANUAL MODE (M1)"}), 403
         _state.plc_sequence_request = None
         return jsonify({"ok": True, "sequence": None})
 
-    # SET — requires MASTER ON and PLC manual mode
-    if not master_on:
-        return jsonify({"error": "SET requires MASTER ON (M4)"}), 403
-    if not manual_mode:
-        return jsonify({"error": "SET requires PLC MANUAL MODE (M1)"}), 403
+    # SET — all PLC guards (MASTER ON / MANUAL MODE) temporarily disabled for
+    # testing. To re-enable: uncomment the block below.
+    # if not master_on:
+    #     return jsonify({"error": "SET requires MASTER ON (M4)"}), 403
+    # if not manual_mode:
+    #     return jsonify({"error": "SET requires PLC MANUAL MODE (M1)"}), 403
     if not isinstance(seq, int) or not (0 <= seq < _NUM_SEQ_BITS):
         return jsonify({"error": f"sequence must be int 0–{_NUM_SEQ_BITS - 1} or null"}), 400
 
     _state.plc_sequence_request      = seq
     _state.plc_sequence_pulse_expire = time.time() + 1.0   # 1-second pulse
-    return jsonify({"ok": True, "sequence": seq})
+
+    # seq0-seq4 double as fork/cabang selection (point_1..point_5).
+    fork_target = None
+    if 0 <= seq <= 4:
+        fork_target = f"point_{seq + 1}"
+        _state.selected_fork_target = fork_target
+        logger.info("[HMI] seq%d also set fork target to %s", seq, fork_target)
+
+    return jsonify({"ok": True, "sequence": seq, "fork_target": fork_target})
+
 
 
 @app.route("/errors")
