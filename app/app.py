@@ -15,6 +15,7 @@ import time
 import threading
 from flask import Flask, render_template, jsonify, request
 from logger import get_error_log
+import keyboard_control
 import logging
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,9 @@ def _build_state_snapshot():
         "web_button_mode":      s.web_button_mode,
         "web_btn_manual":       s.web_btn_manual,
         "web_btn_emergency":    s.web_btn_emergency,
+        "kb_estop":             s.kb_estop,
+        "kb_mode_override":     s.kb_mode_override,
+        "keypad_devices":       list(s.keypad_devices),
     }
 
     # ── What the AGV is writing to the PLC right now ──────────────────────────
@@ -186,6 +190,22 @@ def api_manual_command():
     _state.web_manual_command = cmd
     _state.web_manual_expire  = time.time() + 0.4   # 400 ms watchdog
     return jsonify({"ok": True, "command": cmd})
+
+
+@app.route("/api/keyboard", methods=["POST"])
+def api_keyboard():
+    """One-press keyboard action (laptop keyboard / scripts):
+    {"key": "1".."9" | "0" | "q" | "e" | "k" | "l" | "enter" | ...}.
+    Movement keys (WASD) use /api/manual/command like the jog buttons.
+    Same key map as the USB keypad on the AGV PC — see keyboard_control.py."""
+    if _state is None:
+        return jsonify({"error": "state not initialised"}), 503
+    data = request.get_json(silent=True) or {}
+    key = str(data.get("key", "")).lower()
+    if key not in keyboard_control.ACTION_KEYS:
+        return jsonify({"error": f"unknown key '{key}'"}), 400
+    ok, msg = keyboard_control.handle_key(_state, key, source="web keyboard")
+    return jsonify({"ok": ok, "message": msg}), (200 if ok else 409)
 
 
 _VALID_FORK_TARGETS = {"point_1", "point_2", "point_3", "point_4", "point_5"}
@@ -788,4 +808,4 @@ def run_server(state, engine=None, manager=None):
     _engine  = engine
     _manager = manager
     logger.info("[Flask] Dashboard at http://%s:5000", config.LOCAL_IP)
-    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

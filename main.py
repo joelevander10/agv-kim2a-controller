@@ -15,6 +15,7 @@ from drivers.modbus_ao   import AOWriter
 from drivers.can_mgs1600 import CANReader
 from drivers.rfid_tcp    import RFIDReader
 from drivers.slmp_plc    import SLMPDriver
+from drivers.keypad_evdev import keypad_reader
 from safety_watchdog import safety_watchdog
 import modes
 from rfid_processor import rfid_processor
@@ -220,6 +221,7 @@ async def run():
     core_tasks.append(safety_watchdog(state, watched=watched))
     core_tasks.append(rfid_processor(state, engine))
     core_tasks.append(modes.mode_manager(state, engine, manager))
+    core_tasks.append(keypad_reader(state))      # USB keypad on the AGV PC (returns at once if disabled)
 
     # NAV/SEQ/SLMP run under the manager so the HMI can toggle them live.
     # Boots from the profile JSON values (hierarchy already enforced in config);

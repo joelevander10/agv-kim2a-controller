@@ -36,6 +36,17 @@ class KinematicState:
         # see rfid_processor.py. None = no target chosen; all fork_* sequences
         # with a requires_target are ignored until the operator picks one.
         self.selected_fork_target = None
+        # Keyboard / keypad control (keyboard_control.py, same keys as Kayaba):
+        #   kb_mode_override  None = follow the MANUAL/AUTO selector DI;
+        #                     True/False = Q key forced MANUAL/AUTO (cleared
+        #                     as soon as the physical selector is moved)
+        #   kb_estop          E key emergency stop, latched until RESET
+        #   kb_reset_request  ENTER key: one RESET pulse
+        #   keypad_devices    names of USB keypads currently read on the AGV PC
+        self.kb_mode_override  = None
+        self.kb_estop          = False
+        self.kb_reset_request  = False
+        self.keypad_devices    = []
 
 
 class PerceptionState:
@@ -236,6 +247,26 @@ class AMRState:
     @selected_fork_target.setter
     def selected_fork_target(self, v): self.kinematic.selected_fork_target = v
 
+    @property
+    def kb_mode_override(self): return self.kinematic.kb_mode_override
+    @kb_mode_override.setter
+    def kb_mode_override(self, v): self.kinematic.kb_mode_override = v
+
+    @property
+    def kb_estop(self): return self.kinematic.kb_estop
+    @kb_estop.setter
+    def kb_estop(self, v): self.kinematic.kb_estop = v
+
+    @property
+    def kb_reset_request(self): return self.kinematic.kb_reset_request
+    @kb_reset_request.setter
+    def kb_reset_request(self, v): self.kinematic.kb_reset_request = v
+
+    @property
+    def keypad_devices(self): return self.kinematic.keypad_devices
+    @keypad_devices.setter
+    def keypad_devices(self, v): self.kinematic.keypad_devices = v
+
     # ── PerceptionState shims ─────────────────────────────────────────────────
 
     @property
@@ -323,4 +354,4 @@ class AMRState:
     @property
     def plc_sequence_complete(self): return self.plc.plc_sequence_complete
     @plc_sequence_complete.setter
-    def plc_sequence_complete(self, v): self.plc.plc_sequence_complete = v
+    def plc_sequence_complete(self, v): self.plc.plc_sequence_complete = v

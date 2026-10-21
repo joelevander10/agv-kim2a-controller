@@ -3,3 +3,8 @@ __pycache__/
 *.egg-info/
 .env
 *.log
+
+# Runtime output (stays on the AGV, not in GitHub)
+logs/
+analysis_plot/
+.DS_Store

@@ -123,6 +123,17 @@ detecting their rising edge so each press fires once.
 > web_btn_emergency`. Either the physical e-stop **or** the web emergency button halts the
 > AGV, in bypass mode or not.
 
+#### USB keypad (same key map as AGV Kayaba)
+
+`drivers/keypad_evdev.py` reads a USB keypad on the AGV PC (python-evdev, hot-plug,
+profile block `"keypad"`); `keyboard_control.py` turns each key into an action and is
+also behind `POST /api/keyboard`. WASD / arrows = hold-to-drive in MANUAL (through
+`web_manual_command`, 400 ms watchdog). 1/2/4 = speed APPROACH/SLOW/HIGH. Q = MANUAL/AUTO
+(`kb_mode_override`, cleared when the physical selector moves). K/L = forward track
+left/right.  Cabang (7/8/9/0 on Kayaba) is NOT on the keypad here — it is picked on the HMI. E = latched `kb_estop` (forces
+emergency until RESET). ENTER = one RESET pulse (`kb_reset_request`). Kayaba-only keys
+(3/5 MEDIUM/MAX, 7/8/9/0 cabang, Z/X pusher, R reverse, T/Y rotate) are refused with a message.
+
 ### `auto_mode` (forward tape-following PID loop)
 
 Per cycle (`modes.py:auto_mode`):
@@ -333,6 +344,7 @@ Serves on `http://<LOCAL_IP>:5000`. Shares `AMRState`, `SequenceEngine`, and
 | Motor wiring / channels | `motor_channels` in profile (never hardcode) |
 | Add a hardware driver | subclass `SensorDriver`/`ActuatorDriver` in `drivers/`, wire into `main.run()` (and `DriverManager._SPEC` if toggleable) |
 | PLC bits / handshake | `drivers/slmp_plc.py` + `slmp_plc`/`slmp_manual` maps in profile |
+| Keypad keys / keypad settings | `keyboard_control.py` / `"keypad"` block in profile |
 | HMI endpoints/pages | `app/app.py` + `app/templates/` |
 
 **Debugging scripts** live in `debugging/` (e.g. `check_connections.py`, `read_dio.py`,

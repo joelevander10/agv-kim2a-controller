@@ -755,6 +755,13 @@
       const d = await r.json();
       applyMode(d.agv.mode);
 
+      // E key on the AGV keypad latches an emergency stop until RESET / ENTER.
+      if (d.agv.kb_estop) {
+        lastMode = null;   // let applyMode restore the normal text once released
+        statusBar.className = 'warn';
+        statusBar.textContent = 'KEYPAD E-STOP (E) — press ENTER or RESET to release';
+      }
+
       // Sync web button state from server (handles page reload / multi-tab)
       const serverWbm = d.agv.web_button_mode;
       if (serverWbm !== webBtnActive) {

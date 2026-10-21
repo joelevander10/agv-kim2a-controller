@@ -231,6 +231,17 @@ CAL_V_STEP  = float(_cal.get("V_STEP", 0.02))
 CAL_V_MAX   = float(_cal.get("V_MAX", 0.80))
 CAL_DWELL_S = float(_cal.get("DWELL_S", 4.0))
 
+# ── USB keypad on the AGV PC (drivers/keypad_evdev.py) ───────────────────────
+# Keys: see keyboard_control.py (same key map as AGV Kayaba). Any keyboard-type
+# USB device is used unless NAME_CONTAINS is set (then only devices whose name
+# contains that text). EXCLUDE_NAME_CONTAINS skips built-in keyboards. GRAB =
+# keys go only to the AGV (not to the desktop/terminal of the AGV PC).
+_keypad = _params.get("keypad", {})
+KEYPAD_ENABLED          = bool(_keypad.get("ENABLED", False))
+KEYPAD_NAME_CONTAINS    = str(_keypad.get("NAME_CONTAINS", ""))
+KEYPAD_EXCLUDE_CONTAINS = list(_keypad.get("EXCLUDE_NAME_CONTAINS", ["AT Translated Set 2"]))
+KEYPAD_GRAB             = bool(_keypad.get("GRAB", True))
+
 
 # ── Config validation (fail-fast at boot) ─────────────────────────────────────
 class ConfigError(ValueError):

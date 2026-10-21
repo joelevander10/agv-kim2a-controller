@@ -380,6 +380,7 @@ async def mode_manager(state, engine=None, manager=None):
     active_task  = None
     last_start   = False
     last_reset   = False
+    last_phys_manual = None   # physical MANUAL/AUTO selector, for the Q-key override
 
     async def _cancel_active():
         nonlocal active_task
@@ -433,7 +434,16 @@ async def mode_manager(state, engine=None, manager=None):
             btn_reset      = state.web_btn_reset
         else:
             emergency_safe = not phys_emergency
-            switch_manual  = di[config.DI_MODE_SWITCH]
+            phys_manual    = bool(di[config.DI_MODE_SWITCH])
+            # Q key (keyboard/keypad) overrides the selector until the
+            # selector itself is moved — then the physical switch rules again.
+            if (last_phys_manual is not None and phys_manual != last_phys_manual
+                    and state.kb_mode_override is not None):
+                state.kb_mode_override = None
+                logger.info("Mode selector moved — keyboard MANUAL/AUTO override cleared")
+            last_phys_manual = phys_manual
+            switch_manual  = (phys_manual if state.kb_mode_override is None
+                              else state.kb_mode_override)
             btn_start      = di[config.DI_START]
             btn_reset      = di[config.DI_RESET]
 
@@ -442,6 +452,19 @@ async def mode_manager(state, engine=None, manager=None):
 
         last_start = btn_start
         last_reset = btn_reset
+
+        # ENTER key (keyboard/keypad) = one RESET press, in any mode.
+        if state.kb_reset_request:
+            state.kb_reset_request = False
+            reset_rising = True
+
+        # E key emergency stop: latched until RESET. The same RESET press then
+        # also performs the normal emergency recovery below.
+        if state.kb_estop and reset_rising:
+            state.kb_estop = False
+            logger.info("Keyboard EMERGENCY STOP released by RESET.")
+        if state.kb_estop:
+            emergency_safe = False
 
         # Clear momentary web buttons after reading so they act as single pulses
         if state.web_button_mode:
@@ -580,4 +603,4 @@ async def mode_manager(state, engine=None, manager=None):
             state.current_mode = current_mode
             logger.info("ARMED. Press START to run again.")
 
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.01)
