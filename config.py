@@ -234,6 +234,23 @@ CAL_V_STEP  = float(_cal.get("V_STEP", 0.02))
 CAL_V_MAX   = float(_cal.get("V_MAX", 0.80))
 CAL_DWELL_S = float(_cal.get("DWELL_S", 4.0))
 
+# ── 180° spin-turn on the tape (rotate.py) ──────────────────────────────────
+# Keys T (left/CCW) and Y (right/CW), or the ROTATE buttons on the manual page,
+# in MANUAL or ARMED. Spins at SPEED_MPS (wheel speed), creeps at CREEP_MPS once
+# the front sensor finds the tape again, brakes when |position| <= CENTER_TOL_MM.
+# MIN/MAX_ANGLE_DEG: estimated-angle window in which the tape is accepted /
+# after which the turn is aborted.
+_rot = _params.get("rotate", {})
+ROTATE_ENABLED            = bool(_rot.get("ENABLED", True))
+ROTATE_SPEED_MPS          = float(_rot.get("SPEED_MPS", 0.10))
+ROTATE_CREEP_MPS          = float(_rot.get("CREEP_MPS", 0.04))
+ROTATE_ACCEL_MPS2         = float(_rot.get("ACCEL_MPS2", 0.2))
+ROTATE_CENTER_TOL_MM      = float(_rot.get("CENTER_TOL_MM", 5.0))
+ROTATE_MIN_ANGLE_DEG      = float(_rot.get("MIN_ANGLE_DEG", 100.0))
+ROTATE_MAX_ANGLE_DEG      = float(_rot.get("MAX_ANGLE_DEG", 260.0))
+ROTATE_TIMEOUT_S          = float(_rot.get("TIMEOUT_S", 40.0))
+ROTATE_SETTLE_S           = float(_rot.get("SETTLE_S", 0.5))
+
 # ── USB keypad on the AGV PC (drivers/keypad_evdev.py) ───────────────────────
 # Keys: see keyboard_control.py (same key map as AGV Kayaba). Any keyboard-type
 # USB device is used unless NAME_CONTAINS is set (then only devices whose name

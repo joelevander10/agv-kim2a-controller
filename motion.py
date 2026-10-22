@@ -69,6 +69,12 @@ async def set_forward(state, rpm):
     await _drive(state, True, rpm_to_voltage(rpm, "left"),
                         True, rpm_to_voltage(rpm, "right"))
 
+async def set_wheels(state, left_rpm, right_rpm):
+    """Signed per-wheel command: positive rpm = forward, negative = reverse.
+    Used by rotate.py (spin on the spot at a ramped speed)."""
+    await _drive(state, left_rpm >= 0,  rpm_to_voltage(abs(left_rpm),  "left"),
+                        right_rpm >= 0, rpm_to_voltage(abs(right_rpm), "right"))
+
 async def set_reverse(state, rpm):
     await _drive(state, False, rpm_to_voltage(rpm, "left"),
                         False, rpm_to_voltage(rpm, "right"))

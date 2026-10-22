@@ -47,6 +47,10 @@ class KinematicState:
         self.kb_estop          = False
         self.kb_reset_request  = False
         self.kb_start_request  = False   # G key: one START pulse (AUTO from ARMED)
+        # 180° spin-turn (rotate.py): "left" | "right" | "stop" request from the
+        # T / Y keys or the manual page; rotate_status is shown on the manual page.
+        self.rotate_request    = None
+        self.rotate_status     = {"phase": "idle", "message": "", "angle": 0}
         self.keypad_devices    = []
 
 
@@ -273,6 +277,16 @@ class AMRState:
     def kb_start_request(self): return self.kinematic.kb_start_request
     @kb_start_request.setter
     def kb_start_request(self, v): self.kinematic.kb_start_request = v
+
+    @property
+    def rotate_request(self): return self.kinematic.rotate_request
+    @rotate_request.setter
+    def rotate_request(self, v): self.kinematic.rotate_request = v
+
+    @property
+    def rotate_status(self): return self.kinematic.rotate_status
+    @rotate_status.setter
+    def rotate_status(self, v): self.kinematic.rotate_status = v
 
     @property
     def keypad_devices(self): return self.kinematic.keypad_devices

@@ -103,6 +103,7 @@ def _build_state_snapshot():
         "kb_estop":             s.kb_estop,
         "kb_mode_override":     s.kb_mode_override,
         "keypad_devices":       list(s.keypad_devices),
+        "rotate_status":        dict(s.rotate_status or {}),
     }
 
     # ── What the AGV is writing to the PLC right now ──────────────────────────
@@ -206,6 +207,23 @@ def api_keyboard():
         return jsonify({"error": f"unknown key '{key}'"}), 400
     ok, msg = keyboard_control.handle_key(_state, key, source="web keyboard")
     return jsonify({"ok": ok, "message": msg}), (200 if ok else 409)
+
+
+@app.route("/api/rotate", methods=["POST"])
+def api_rotate():
+    """180° spin-turn on the tape from the MANUAL page (same as keys T / Y):
+    {"direction": "left" | "right"} — MANUAL or ARMED, tape under the front
+    sensor. {"direction": "stop"} — stop a running turn."""
+    if _state is None:
+        return jsonify({"error": "state not initialised"}), 503
+    data = request.get_json(silent=True) or {}
+    direction = data.get("direction")
+    if direction not in ("left", "right", "stop"):
+        return jsonify({"error": "direction must be 'left', 'right' or 'stop'"}), 400
+    ok, msg = keyboard_control.request_rotate(_state, direction, source="web")
+    if not ok:
+        return jsonify({"error": msg}), 409
+    return jsonify({"ok": True, "message": msg})
 
 
 _VALID_FORK_TARGETS = {"point_1", "point_2", "point_3", "point_4", "point_5"}
@@ -528,7 +546,7 @@ def _tuning_guard():
     if _state is None:
         return {"error": "state not initialised"}, 503
     mode = _state.current_mode
-    if mode in ("running", "emergency", "autotune"):
+    if mode in ("running", "emergency", "autotune", "rotating"):
         return {"error": f"Cannot change tuning while AGV is {mode}"}, 403
     return None
 
@@ -574,7 +592,7 @@ def api_tuning():
             "specs":    {k: list(v) for k, v in config.TUNABLE_SPECS.items()},
             "defaults": config.TUNABLE_DEFAULTS,
             "saved":    sorted(config.TUNING_SAVED),
-            "locked":   mode in ("running", "emergency", "autotune"),
+            "locked":   mode in ("running", "emergency", "autotune", "rotating"),
         })
 
     err = _tuning_guard()

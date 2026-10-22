@@ -30,7 +30,9 @@ Actions (one press)
     E EMERGENCY STOP — latched, released only by RESET
     ENTER RESET (same as the RESET button: releases E-stop / emergency,
           stops AUTO back to ARMED)
-    R  auto reverse, T / Y  rotate 180° — not on this AGV
+    T / Y rotate 180° on the tape LEFT (CCW) / RIGHT (CW)   (MANUAL/ARMED;
+          press T or Y again during the turn to stop it)
+    R  auto reverse — not on this AGV
     7 / 8 / 9 / 0  cabang — not used on this AGV's keypad (pick it on the HMI)
 """
 import logging
@@ -43,6 +45,7 @@ logger = logging.getLogger(__name__)
 MOVE_KEYS = {"w", "a", "s", "d"}
 SPEED_KEYS = {"1": "APPROACH", "2": "SLOW", "4": "HIGH"}
 TRACK_KEYS = {"k": "left", "l": "right"}
+ROTATE_KEYS = {"t": "left", "y": "right"}
 # PLC trolley manual bits (hold-to-run, MANUAL only) — see apply_plc().
 PLC_HOLD_KEYS = {
     "z": "M2212",   # pusher EXTEND
@@ -65,14 +68,12 @@ UNSUPPORTED_KEYS = {
     "3": "speed MEDIUM is not available on this AGV (APPROACH/SLOW/HIGH only)",
     "5": "speed MAX is not available on this AGV (APPROACH/SLOW/HIGH only)",
     "r": "this AGV has no AUTO REVERSE",
-    "t": "this AGV has no 180° rotate",
-    "y": "this AGV has no 180° rotate",
     "7": "cabang is selected on the HMI, not the keypad",
     "8": "cabang is selected on the HMI, not the keypad",
     "9": "cabang is selected on the HMI, not the keypad",
     "0": "cabang is selected on the HMI, not the keypad",
 }
-ACTION_KEYS = (set(SPEED_KEYS) | set(TRACK_KEYS)
+ACTION_KEYS = (set(SPEED_KEYS) | set(TRACK_KEYS) | set(ROTATE_KEYS)
                | set(UNSUPPORTED_KEYS) | {"q", "e", "g", "enter"})
 MOVE_WATCHDOG_S = 0.4      # same 400 ms watchdog as the web jog buttons
 
@@ -183,6 +184,9 @@ def handle_key(state, key, source="keyboard"):
         logger.info("[%s] Q — switch to %s", source, "MANUAL" if want_manual else "AUTO")
         return True, "MANUAL" if want_manual else "AUTO (ARMED)"
 
+    if key in ROTATE_KEYS:
+        return request_rotate(state, ROTATE_KEYS[key], source)
+
     if key in TRACK_KEYS:
         side = TRACK_KEYS[key]
         if mode in ("armed", "running"):
@@ -192,3 +196,21 @@ def handle_key(state, key, source="keyboard"):
         return False, f"track keys work in ARMED/RUNNING (now {mode})"
 
     return False, f"unknown key '{key}'"
+
+
+def request_rotate(state, direction, source="keyboard"):
+    """Ask mode_manager for a 180° turn ("left" / "right"), or "stop".
+    While a turn is running, any rotate request stops it."""
+    import rotate
+    if state.current_mode == "rotating" or direction == "stop":
+        if state.current_mode != "rotating":
+            return False, "no turn running"
+        state.rotate_request = "stop"
+        logger.info("[%s] rotate — STOP", source)
+        return True, "rotate STOP"
+    ok, why = rotate.check_start(state)
+    if not ok:
+        return False, why
+    state.rotate_request = direction
+    logger.info("[%s] rotate 180° %s", source, direction.upper())
+    return True, f"rotate 180° {direction.upper()}"

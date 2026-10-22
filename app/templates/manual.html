@@ -398,6 +398,22 @@
 
   /* Active highlight on EMG lamp-sm */
   .lamp-sm.on-red { background: radial-gradient(circle at 35% 35%, #ff8080, #c00000); border-color: #600000; box-shadow: 0 0 8px 1px #ff000066; }
+  /* ── 180° rotate on the tape (same as keys T / Y) ── */
+  .rot-panel { display: flex; flex-direction: column; gap: 6px; width: 100%;
+               border-top: 1px solid #909090; padding-top: 10px; }
+  .rot-title { font-size: 14px; color: #303060; }
+  .rot-btns  { display: flex; gap: 6px; }
+  .rot-btn {
+    flex: 1; padding: 8px 0; cursor: pointer; touch-action: manipulation;
+    font-family: inherit; font-size: 14px; font-weight: bold; line-height: 1.2; color: #000;
+    background: #90b8e0;
+    border-top: 3px solid #d0e4f8; border-left: 3px solid #d0e4f8;
+    border-right: 3px solid #405870; border-bottom: 3px solid #405870;
+  }
+  .rot-btn.stop { background: #c8c8c8; border-top-color: #f0f0f0; border-left-color: #f0f0f0;
+                  border-right-color: #707070; border-bottom-color: #707070; }
+  .rot-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #rot-msg { font-size: 12px; min-height: 30px; color: #000080; overflow-wrap: anywhere; }
 </style>
 </head>
 <body class="not-manual web-btn-off">
@@ -512,6 +528,15 @@
       <div class="sen-field-row">
         <span class="lamp-sm" id="m-fail"></span><span class="sen-label">FAIL</span>
       </div>
+    </div>
+    <div class="rot-panel">
+      <span class="rot-title">ROTATE 180&deg;</span>
+      <div class="rot-btns">
+        <button class="rot-btn" id="rot-left" disabled>&#8634;<br>T</button>
+        <button class="rot-btn" id="rot-right" disabled>&#8635;<br>Y</button>
+      </div>
+      <button class="rot-btn stop" id="rot-stop" disabled>&#9632; STOP</button>
+      <div id="rot-msg">MANUAL / ARMED</div>
     </div>
   </div>
 </div>
@@ -715,6 +740,57 @@
   document.getElementById('btn-byp-exit').disabled = true;
 
   // ══════════════════════════════════════════════════════════════════════════════
+  //  180° ROTATE (same as keys T / Y; server re-checks tape under the sensor)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  const rotLeftBtn  = document.getElementById('rot-left');
+  const rotRightBtn = document.getElementById('rot-right');
+  const rotStopBtn  = document.getElementById('rot-stop');
+  const rotMsg      = document.getElementById('rot-msg');
+  let   rotMsgUntil = 0;
+
+  function postRotate(direction) {
+    fetch('/api/rotate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ direction })
+    })
+    .then(r => r.json())
+    .then(d => {
+      rotMsg.style.color = d.ok ? '#006000' : '#c00000';
+      rotMsg.textContent = d.ok ? (d.message || 'OK') : (d.error || 'ERROR');
+      rotMsgUntil = Date.now() + 4000;
+    })
+    .catch(() => {
+      rotMsg.style.color = '#c00000';
+      rotMsg.textContent = 'NO CONNECTION';
+      rotMsgUntil = Date.now() + 4000;
+    });
+  }
+  rotLeftBtn.addEventListener('click',  () => postRotate('left'));
+  rotRightBtn.addEventListener('click', () => postRotate('right'));
+  rotStopBtn.addEventListener('click',  () => postRotate('stop'));
+
+  function applyRotateUi(mode, st) {
+    const canStart = (mode === 'manual' || mode === 'armed');
+    rotLeftBtn.disabled  = !canStart;
+    rotRightBtn.disabled = !canStart;
+    rotStopBtn.disabled  = (mode !== 'rotating');
+    if (Date.now() < rotMsgUntil) return;
+    const recent = st.t && (Date.now() / 1000 - st.t) < 15;
+    if (mode === 'rotating') {
+      rotMsg.style.color = '#000080';
+      rotMsg.textContent = 'TURNING ~' + (st.angle || 0) + '°' + (st.message ? ' — ' + st.message : '');
+    } else if (recent && st.phase && st.phase !== 'idle') {
+      rotMsg.style.color = st.phase === 'done' ? '#006000' : '#c00000';
+      rotMsg.textContent = st.phase.toUpperCase() + (st.message ? ': ' + st.message : '');
+    } else {
+      rotMsg.style.color = '#000080';
+      rotMsg.textContent = canStart ? 'READY' : 'MANUAL / ARMED';
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
   //  STATE POLLING
   // ══════════════════════════════════════════════════════════════════════════════
 
@@ -754,6 +830,13 @@
       if (!r.ok) throw new Error(r.status);
       const d = await r.json();
       applyMode(d.agv.mode);
+
+      applyRotateUi(d.agv.mode, d.agv.rotate_status || {});
+      if (d.agv.mode === 'rotating') {
+        lastMode = null;
+        statusBar.className = 'ok';
+        statusBar.textContent = 'ROTATING 180° — press T / Y, STOP or RESET to stop.';
+      }
 
       // E key on the AGV keypad latches an emergency stop until RESET / ENTER.
       if (d.agv.kb_estop) {

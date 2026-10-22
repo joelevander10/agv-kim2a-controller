@@ -6,6 +6,7 @@ import config
 import motion
 import calibration
 import autotune
+import rotate
 
 from core.pid import PIDController
 from debugging.plotter import RunRecorder
@@ -386,6 +387,7 @@ async def mode_manager(state, engine=None, manager=None):
     last_start   = False
     last_reset   = False
     last_phys_manual = None   # physical MANUAL/AUTO selector, for the Q-key override
+    rotate_from_manual = False   # mode a 180° turn started from (back to it after)
 
     async def _cancel_active():
         nonlocal active_task
@@ -415,6 +417,7 @@ async def mode_manager(state, engine=None, manager=None):
         state.pending_sequence    = None
         state.calibration_request = False
         state.autotune_request    = False
+        state.rotate_request      = None    # a T/Y press before this transition is dropped
         # selected_fork_target is intentionally NOT reset here — it's the
         # operator's chosen destination from the homepost HMI and should
         # survive a RESET/EMERGENCY/mode-switch so the operator doesn't have
@@ -552,6 +555,58 @@ async def mode_manager(state, engine=None, manager=None):
             logger.info("Startup: ARMED (initializing outputs)")
             current_mode       = "armed"
             state.current_mode = current_mode
+
+        # ── 180° spin-turn (rotate.py) ────────────────────────────────────
+        # Started by T / Y (keyboard + AGV keypad) or the manual page, from
+        # MANUAL or ARMED. Ends centred on the tape, stopped, back in the mode
+        # it came from (stop and wait). RESET, T/Y again, the web STOP or
+        # moving the selector stops it; emergency is handled above.
+        elif current_mode == "rotating":
+            done = active_task is None or active_task.done()
+            stop_req = state.rotate_request == "stop"
+            if reset_rising or stop_req or done or bool(switch_manual) != rotate_from_manual:
+                if done:
+                    if active_task is not None and not active_task.cancelled():
+                        exc = active_task.exception()
+                        if exc is not None:
+                            logger.error("[ROTATE] task error: %r", exc)
+                            state.rotate_status = {"phase": "failed", "message": f"error: {exc}",
+                                                   "angle": 0, "t": time.time()}
+                    active_task = None
+                else:
+                    logger.info("[ROTATE] %s — stopping the turn.",
+                                "RESET" if reset_rising else
+                                "STOP" if stop_req else "mode selector moved")
+                    await _cancel_active()
+                await _flush_and_idle()
+                state.rotate_request = None
+                if switch_manual:
+                    logger.info("[ROTATE] finished — back to MANUAL.")
+                    active_task        = asyncio.create_task(manual_mode(state))
+                    current_mode       = "manual"
+                else:
+                    logger.info("[ROTATE] finished — back to ARMED.")
+                    current_mode       = "armed"
+                state.current_mode = current_mode
+
+        elif (current_mode in ("manual", "armed") and state.rotate_request
+              and (current_mode == "manual") == bool(switch_manual)):
+            direction = state.rotate_request
+            state.rotate_request = None
+            ok, why = (False, "nothing to stop") if direction == "stop" else rotate.check_start(state)
+            if not ok:
+                if direction != "stop":
+                    logger.warning("[ROTATE] %s ignored — %s", direction.upper(), why)
+                    state.rotate_status = {"phase": "refused", "message": why,
+                                           "angle": 0, "t": time.time()}
+            else:
+                rotate_from_manual = current_mode == "manual"
+                await _cancel_active()          # stops manual_mode's jog loop
+                await _flush_and_idle()
+                state.web_manual_command = None
+                active_task        = asyncio.create_task(rotate.rotate_mode(state, direction))
+                current_mode       = "rotating"
+                state.current_mode = current_mode
 
         elif switch_manual and current_mode != "manual":
             logger.info("Mode switch: MANUAL")
