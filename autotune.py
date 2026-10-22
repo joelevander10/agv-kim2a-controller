@@ -27,9 +27,14 @@ the web STOP; an error above err_limit ends the test (the data recorded up to
 then is still used if there is enough). RFID tags are not acted on (see
 rfid_processor.py). Gains are only applied when the engineer presses APPLY.
 
-Ported from the AGV Kayaba controller. KIM2A differences: speed modes HIGH and
-SLOW only (APPROACH runs against the guide bar, a relay test makes no sense
-there), no lidar, forward error sign fixed at -1 like auto_mode.
+Ported from the AGV Kayaba controller. KIM2A differences: speed modes HIGH,
+SLOW and APPROACH, no lidar, forward error sign fixed at -1 like auto_mode.
+
+APPROACH: in normal AUTO the station approach runs against the one-sided guide
+bar with an asymmetric output clamp (+8 rpm into the bar). The test itself
+uses the normal symmetric clamp, so it MUST run on a straight tape WITHOUT the
+guide bar (the bar would hold the AGV and spoil the fit). Only KP / TD / N
+are proposed; the into-bar / away clamps stay as they are.
 """
 import asyncio
 import logging
@@ -47,6 +52,9 @@ logger = logging.getLogger(__name__)
 MODE_INFO = {
     "HIGH":   ("AUTO_TARGET_HIGH_SPEED",   ("KP",      "TD",      "N",      "V_RED_COEF")),
     "SLOW":   ("AUTO_TARGET_SLOW_SPEED",   ("KP_SLOW", "TD_SLOW", "N_SLOW", "V_RED_COEF_SLOW")),
+    # Run on straight tape WITHOUT the guide bar — see the module docstring.
+    "APPROACH": ("AUTO_TARGET_APPROACH_SPEED", ("KP_APPROACH", "TD_APPROACH",
+                                                "N_APPROACH", "V_RED_COEF_APPROACH")),
 }
 ERROR_SIGN = -1.0          # forward: e = -pv, same as modes.auto_mode
 
@@ -130,6 +138,10 @@ def build_result(mode, d, h, ts, us, pvs, periods, amps, speed):
         warn.append("Fitted gain is not positive — check the track (K/L) and that the AGV runs forward on the tape; gains not reliable.")
     if fit["r2"] < 0.7:
         warn.append(f"Model fit is weak (R² {fit['r2']:.2f}) — repeat on a straighter tape or with a bigger relay.")
+    if mode == "APPROACH":
+        warn.append("APPROACH: valid only if measured on tape WITHOUT the guide bar. In AUTO the "
+                    "+8 rpm into-bar clamp still limits steering toward the bar; check a station "
+                    "stop after APPLY.")
     if lag_est >= 0.35:
         warn.append(f"Drive lag ≈ {lag_est:.2f} s is large — the motor drivers react slowly "
                     "(check the drivers' own accel/decel time setting).")

@@ -380,7 +380,7 @@
   <div class="section-title">PID AUTO-TUNE &nbsp;<span class="dep-note">(relay test · ARMED on a STRAIGHT tape · area clear)</span></div>
   <div class="at-row">
     <label>Speed mode
-      <select id="at-mode"><option selected>HIGH</option><option>SLOW</option></select></label>
+      <select id="at-mode"><option selected>HIGH</option><option>SLOW</option><option value="APPROACH">APPROACH (no guide bar)</option></select></label>
     <label>Relay (rpm)<input id="at-relay" type="number" value="20" min="5" max="400" step="5"></label>
     <label>Max error (mm)<input id="at-limit" type="number" value="50" min="10" max="90" step="5"></label>
     <label>Time limit (s)<input id="at-time" type="number" value="30" min="5" max="120" step="5"></label>
@@ -388,7 +388,7 @@
     <button class="cal-btn start" id="at-start">START</button>
     <button class="cal-btn stop" id="at-stop">STOP</button>
   </div>
-  <div class="at-note">The AGV accelerates to the mode's speed on its current gains, then weaves gently around the tape for up to 10 s (relay test), brakes, and fits a model of how it steers. Suggested KP / TD / N are shown below — press APPLY on one (it is saved), then test a normal run. Needs about (speed × time limit) metres of straight tape. RFID tags are ignored during the test. RESET or STOP aborts. HIGH and SLOW each tune their own gain set.</div>
+  <div class="at-note">The AGV accelerates to the mode's speed on its current gains, then weaves gently around the tape for up to 10 s (relay test), brakes, and fits a model of how it steers. Suggested KP / TD / N are shown below — press APPLY on one (it is saved), then test a normal run. Needs about (speed × time limit) metres of straight tape. RFID tags are ignored during the test. RESET or STOP aborts. HIGH, SLOW and APPROACH each tune their own gain set. Run APPROACH on straight tape WITHOUT the guide bar; the into-bar clamp is not changed.</div>
   <div id="at-msg">—</div>
   <div id="at-result"></div>
 </div>
