@@ -262,7 +262,7 @@
       "category": "sequence",
       "trigger": {
         "type": "rfid_then_marker",
-        "rfid_tag": "0096",
+        "rfid_tag": "00CC",
         "marker_side": "prox",
         "approach_timeout": 45.0,
         "approach_speed": "APPROACH"
