@@ -130,9 +130,13 @@ profile block `"keypad"`); `keyboard_control.py` turns each key into an action a
 also behind `POST /api/keyboard`. WASD / arrows = hold-to-drive in MANUAL (through
 `web_manual_command`, 400 ms watchdog). 1/2/4 = speed APPROACH/SLOW/HIGH. Q = MANUAL/AUTO
 (`kb_mode_override`, cleared when the physical selector moves). K/L = forward track
-left/right.  Cabang (7/8/9/0 on Kayaba) is NOT on the keypad here — it is picked on the HMI. E = latched `kb_estop` (forces
+left/right.  Cabang (7/8/9/0 on Kayaba) is NOT on the keypad here — it is picked on the HMI.
+PLC trolley keys (hold-to-run, MANUAL only, SLMP on) write the same `trolley.write_bits` as the
+TROLLEY page: Z/X pusher EXTEND/RETRACT (M2212/M2213), U/I/O top conveyor FWD/RVS/CLR
+(M2104-M2106), B/N/M bottom conveyor FWD/RVS/CLR (M2124-M2126). Bits drop to 0 on release,
+unplug, or leaving MANUAL; opposite keys held together cancel. E = latched `kb_estop` (forces
 emergency until RESET). ENTER = one RESET pulse (`kb_reset_request`). Kayaba-only keys
-(3/5 MEDIUM/MAX, 7/8/9/0 cabang, Z/X pusher, R reverse, T/Y rotate) are refused with a message.
+(3/5 MEDIUM/MAX, 7/8/9/0 cabang, R reverse, T/Y rotate) are refused with a message.
 
 ### `auto_mode` (forward tape-following PID loop)
 

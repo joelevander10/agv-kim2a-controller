@@ -9,6 +9,9 @@ hands them to keyboard_control.py — the same key map as the web MANUAL page.
 * Movement keys (WASD) are hold-to-drive: while held the command is refreshed
   every 100 ms; on release, unplug or read error the AGV stops (and the 400 ms
   watchdog in manual_mode stops it anyway if this task ever stalls).
+* PLC trolley keys (Z/X pusher, U/I/O top conveyor, B/N/M bottom conveyor) are
+  hold-to-run too: the PLC bit is 1 while the key is held and goes back to 0
+  on release, unplug, read error, or as soon as the AGV leaves MANUAL.
 * GRAB (profile keypad.GRAB): the keypad's keys go only to the AGV, not to the
   AGV PC's desktop or terminal.
 * Permissions: the user running the controller must be in group "input":
@@ -37,7 +40,7 @@ REFRESH_S = 0.1
 def _code_map():
     """evdev key code -> our key name (top-row digits AND numpad digits)."""
     m = {}
-    for letter in "wasdzxrqetykl":
+    for letter in "wasdzxrqetykluiobnm":
         m[getattr(ecodes, f"KEY_{letter.upper()}")] = letter
     for d in "0123456789":
         m[getattr(ecodes, f"KEY_{d}")] = d
@@ -75,8 +78,9 @@ async def keypad_reader(state):
 
     codes = _code_map()
     devices = {}            # path -> (InputDevice, task)
-    held = {}               # path -> set of movement keys held on that device
+    held = {}               # path -> set of hold keys (move + PLC) held on that device
     sent_cmd = [None]       # last movement command this task sent
+    plc_on = [set()]        # PLC addresses this task currently holds at 1
 
     def _publish():
         allheld = set().union(*held.values()) if held else set()
@@ -87,6 +91,10 @@ async def keypad_reader(state):
         elif sent_cmd[0] is not None:
             kc.apply_move(state, None)      # release -> stop at once
             sent_cmd[0] = None
+        before = plc_on[0]
+        plc_on[0] = kc.apply_plc(state, allheld, before)
+        if plc_on[0] != before:
+            logger.info("[Keypad] PLC bits on: %s", ", ".join(sorted(plc_on[0])) or "none")
 
     async def _refresh():
         while True:
@@ -103,9 +111,14 @@ async def keypad_reader(state):
                 key = codes.get(ev.code)
                 if key is None:
                     continue
-                if key in kc.MOVE_KEYS:
+                if key in kc.MOVE_KEYS or key in kc.PLC_HOLD_KEYS:
                     if ev.value == 1:
                         held[path].add(key)
+                        if key in kc.PLC_HOLD_KEYS:
+                            why = kc.plc_block_reason(state)
+                            if why:
+                                logger.warning("[Keypad] %s (%s) ignored — %s",
+                                               key.upper(), kc.PLC_KEY_NAMES[key], why)
                     elif ev.value == 0:
                         held[path].discard(key)
                     _publish()
@@ -118,7 +131,7 @@ async def keypad_reader(state):
                 logger.warning("[Keypad] '%s' disconnected (%s)", dev.name, e)
         finally:
             held.pop(path, None)
-            _publish()                              # stop if it was driving
+            _publish()                              # stop driving / release PLC bits
             devices.pop(path, None)
             state.keypad_devices = [d.name for d, _ in devices.values()]
             try:

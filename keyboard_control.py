@@ -6,13 +6,20 @@ One place that turns a key into an action, used by BOTH:
   * the laptop keyboard (POST /api/keyboard)
 
 Same key map as the AGV Kayaba keypad, so operators use one layout on both
-AGVs. Keys for hardware this AGV does not have (pusher, auto reverse, 180°
-rotate, MEDIUM/MAX speed) are recognised but refused with a message.
+AGVs. Keys for features this AGV does not have (auto reverse, 180° rotate,
+MEDIUM/MAX speed) are recognised but refused with a message.
 
 Movement (hold-to-drive, MANUAL mode only)
     W forward   S reverse   A spin left   D spin right
     (arrow keys / remote D-pad do the same)
     W+A / W+D / S+A / S+D = curve. Releasing the keys stops.
+PLC trolley controls (hold-to-run, MANUAL only, needs SLMP enabled)
+    Same bits as the buttons on the TROLLEY page; 1 while held, 0 on release.
+    Z pusher EXTEND (M2212)        X pusher RETRACT (M2213)
+    U top conveyor FWD (M2104)     I top RVS (M2105)     O top CLR ERR (M2106)
+    B bottom conveyor FWD (M2124)  N bottom RVS (M2125)  M bottom CLR ERR (M2126)
+    Opposite keys held together (Z+X, U+I, B+N) cancel each other.
+    Brake / brake release stay on the TROLLEY page.
 Actions (one press)
     1 APPROACH  2 SLOW  4 HIGH          (AUTO speed mode; ARMED/RUNNING)
     3 / 5       MEDIUM / MAX            — not on this AGV
@@ -22,23 +29,40 @@ Actions (one press)
     E EMERGENCY STOP — latched, released only by RESET
     ENTER RESET (same as the RESET button: releases E-stop / emergency,
           stops AUTO back to ARMED)
-    Z / X  pusher, R  auto reverse, T / Y  rotate 180° — not on this AGV
+    R  auto reverse, T / Y  rotate 180° — not on this AGV
     7 / 8 / 9 / 0  cabang — not used on this AGV's keypad (pick it on the HMI)
 """
 import logging
 import time
+
+import config
 
 logger = logging.getLogger(__name__)
 
 MOVE_KEYS = {"w", "a", "s", "d"}
 SPEED_KEYS = {"1": "APPROACH", "2": "SLOW", "4": "HIGH"}
 TRACK_KEYS = {"k": "left", "l": "right"}
+# PLC trolley manual bits (hold-to-run, MANUAL only) — see apply_plc().
+PLC_HOLD_KEYS = {
+    "z": "M2212",   # pusher EXTEND
+    "x": "M2213",   # pusher RETRACT
+    "u": "M2104",   # top conveyor FWD
+    "i": "M2105",   # top conveyor RVS
+    "o": "M2106",   # top conveyor CLR ERR
+    "b": "M2124",   # bottom conveyor FWD
+    "n": "M2125",   # bottom conveyor RVS
+    "m": "M2126",   # bottom conveyor CLR ERR
+}
+PLC_KEY_NAMES = {
+    "z": "pusher EXTEND", "x": "pusher RETRACT",
+    "u": "top conv FWD", "i": "top conv RVS", "o": "top conv CLR ERR",
+    "b": "bottom conv FWD", "n": "bottom conv RVS", "m": "bottom conv CLR ERR",
+}
+PLC_OPPOSITES = (("z", "x"), ("u", "i"), ("b", "n"))
 # Kayaba keys with no matching hardware/feature on KIM2A.
 UNSUPPORTED_KEYS = {
     "3": "speed MEDIUM is not available on this AGV (APPROACH/SLOW/HIGH only)",
     "5": "speed MAX is not available on this AGV (APPROACH/SLOW/HIGH only)",
-    "z": "this AGV has no pusher",
-    "x": "this AGV has no pusher",
     "r": "this AGV has no AUTO REVERSE",
     "t": "this AGV has no 180° rotate",
     "y": "this AGV has no 180° rotate",
@@ -79,6 +103,37 @@ def apply_move(state, cmd):
     state.web_manual_command = cmd
     state.web_manual_expire = time.time() + MOVE_WATCHDOG_S
     return True
+
+
+def plc_block_reason(state):
+    """Why PLC hold keys can't run right now, or None if they can."""
+    if not config.SLMP_ENABLED:
+        return "PLC link (SLMP) is disabled"
+    if state.current_mode != "manual":
+        return f"PLC keys work in MANUAL only (now {state.current_mode})"
+    return None
+
+
+def apply_plc(state, held, prev):
+    """Drive the PLC trolley bits for the PLC keys currently `held`.
+
+    `prev` is the set of addresses this caller turned on last time; only those
+    are ever turned off again, so a button held on the TROLLEY web page is not
+    cancelled by the keypad. Outside MANUAL (or with SLMP off) every bit the
+    caller owns is released. Returns the new set of addresses held on."""
+    keys = set(held) & set(PLC_HOLD_KEYS)
+    for a, b in PLC_OPPOSITES:
+        if a in keys and b in keys:
+            keys -= {a, b}                 # contradictory — run neither
+    if plc_block_reason(state) is not None:
+        keys = set()
+    want = {PLC_HOLD_KEYS[k] for k in keys}
+    wb = state.trolley.write_bits
+    for addr in prev - want:
+        wb[addr] = 0
+    for addr in want:
+        wb[addr] = 1                       # re-assert while held
+    return want
 
 
 def handle_key(state, key, source="keyboard"):
