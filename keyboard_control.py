@@ -23,6 +23,7 @@ PLC trolley controls (hold-to-run, MANUAL only, needs SLMP enabled)
 Actions (one press)
     1 APPROACH  2 SLOW  4 HIGH          (AUTO speed mode; ARMED/RUNNING)
     3 / 5       MEDIUM / MAX            — not on this AGV
+    G START AUTO from ARMED (same as the START button; needs tape)
     Q switch MANUAL <-> AUTO (overrides the selector until it is moved)
     K / L select forward track LEFT / RIGHT by hand (ARMED/RUNNING).
           A later RFID set_track sequence can change it again.
@@ -72,7 +73,7 @@ UNSUPPORTED_KEYS = {
     "0": "cabang is selected on the HMI, not the keypad",
 }
 ACTION_KEYS = (set(SPEED_KEYS) | set(TRACK_KEYS)
-               | set(UNSUPPORTED_KEYS) | {"q", "e", "enter"})
+               | set(UNSUPPORTED_KEYS) | {"q", "e", "g", "enter"})
 MOVE_WATCHDOG_S = 0.4      # same 400 ms watchdog as the web jog buttons
 
 
@@ -154,6 +155,16 @@ def handle_key(state, key, source="keyboard"):
 
     if key in UNSUPPORTED_KEYS:
         return False, UNSUPPORTED_KEYS[key]
+
+    if key == "g":
+        if mode != "armed":
+            return False, f"G starts AUTO only from ARMED (now {mode})"
+        raw = state.latest_sensor
+        if not (raw and raw.get("tape_detected")):
+            return False, "no tape under the front sensor"
+        state.kb_start_request = True        # one START pulse, read by mode_manager
+        logger.info("[%s] G — START AUTO", source)
+        return True, "START AUTO"
 
     if key in SPEED_KEYS:
         speed = SPEED_KEYS[key]

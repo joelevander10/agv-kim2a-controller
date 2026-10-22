@@ -46,6 +46,7 @@ class KinematicState:
         self.kb_mode_override  = None
         self.kb_estop          = False
         self.kb_reset_request  = False
+        self.kb_start_request  = False   # G key: one START pulse (AUTO from ARMED)
         self.keypad_devices    = []
 
 
@@ -267,6 +268,11 @@ class AMRState:
     def kb_reset_request(self): return self.kinematic.kb_reset_request
     @kb_reset_request.setter
     def kb_reset_request(self, v): self.kinematic.kb_reset_request = v
+
+    @property
+    def kb_start_request(self): return self.kinematic.kb_start_request
+    @kb_start_request.setter
+    def kb_start_request(self, v): self.kinematic.kb_start_request = v
 
     @property
     def keypad_devices(self): return self.kinematic.keypad_devices

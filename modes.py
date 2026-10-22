@@ -288,8 +288,9 @@ async def auto_mode(state, engine=None):
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def manual_mode(state):
-    """Handles pendant jogging and web remote.
+    """Handles pendant jogging, web remote and USB keypad.
     Web remote (state.web_manual_command) takes priority over physical DI buttons.
+    While nothing is jogging the wheel brakes are ON (set_brake), not released.
     Emergency is fully owned by mode_manager — this task does not check it."""
     current_motion = None
     last_rpms      = None   # (rpm_high, rpm_slow) actually commanded
@@ -350,7 +351,10 @@ async def manual_mode(state):
             elif motion_state == "reverse":   await motion.set_reverse(state, rpm_high)
             elif motion_state == "left":      await motion.set_left(state, rpm_slow)
             elif motion_state == "right":     await motion.set_right(state, rpm_slow)
-            elif motion_state == "idle":      await motion.idle(state)
+            elif motion_state == "idle":
+                # Not jogging -> wheel brakes ON, so the AGV holds still in
+                # MANUAL (released again by _drive on the next jog command).
+                await motion.set_brake(state)
             current_motion = motion_state
             last_rpms      = rpms
 
@@ -459,6 +463,12 @@ async def mode_manager(state, engine=None, manager=None):
         if state.kb_reset_request:
             state.kb_reset_request = False
             reset_rising = True
+
+        # G key (keyboard/keypad) = one START press. Only ARMED acts on it
+        # (same tape check as the START button); anywhere else it is dropped.
+        if state.kb_start_request:
+            state.kb_start_request = False
+            start_rising = True
 
         # E key emergency stop: latched until RESET. The same RESET press then
         # also performs the normal emergency recovery below.
