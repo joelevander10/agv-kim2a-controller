@@ -5,6 +5,7 @@ import time
 import config
 import motion
 import calibration
+import autotune
 
 from core.pid import PIDController
 from debugging.plotter import RunRecorder
@@ -409,6 +410,7 @@ async def mode_manager(state, engine=None, manager=None):
         state.track_follow        = "left"
         state.pending_sequence    = None
         state.calibration_request = False
+        state.autotune_request    = False
         # selected_fork_target is intentionally NOT reset here — it's the
         # operator's chosen destination from the homepost HMI and should
         # survive a RESET/EMERGENCY/mode-switch so the operator doesn't have
@@ -584,6 +586,24 @@ async def mode_manager(state, engine=None, manager=None):
             active_task        = asyncio.create_task(
                 calibration.calibrate_mode(state, manager))
             current_mode       = "calibrate"
+            state.current_mode = current_mode
+
+        elif current_mode == "armed" and state.autotune_request:
+            # PID auto-tune (relay test) on a straight tape — see autotune.py.
+            # Tape check is done by the web endpoint; RFID tags are ignored.
+            logger.info("AUTOTUNE START — launching relay test.")
+            await _cancel_active()
+            await _flush_and_idle()
+            active_task        = asyncio.create_task(autotune.autotune_mode(state))
+            current_mode       = "autotune"
+            state.current_mode = current_mode
+
+        elif current_mode == "autotune" and (reset_rising or not state.autotune_request):
+            logger.info("AUTOTUNE END — returning to ARMED.")
+            state.autotune_request = False
+            await _cancel_active()
+            await _flush_and_brake()
+            current_mode       = "armed"
             state.current_mode = current_mode
 
         elif current_mode == "calibrate" and (reset_rising or not state.calibration_request):

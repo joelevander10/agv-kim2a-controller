@@ -23,6 +23,18 @@ def rpm_to_voltage(rpm, side="left"):
     k, o = _cal(side)
     return max(0.0, min(5.0, (rpm - o) / k))
 
+def max_rpm(side="left"):
+    """Highest motor rpm one wheel can be commanded (5 V on its speed AO)."""
+    return voltage_to_rpm(5.0, side)
+
+def keep_steering(left_rpm, right_rpm):
+    """If either wheel is asked for more than it can do (5 V), slow BOTH
+    wheels by the excess so the left/right difference — the steering — is
+    kept. Without this, near top speed the faster wheel is clipped at 5 V and
+    small steering corrections are lost. Used by autotune.py."""
+    excess = max(left_rpm - max_rpm("left"), right_rpm - max_rpm("right"), 0.0)
+    return left_rpm - excess, right_rpm - excess
+
 def mps_to_rpm(v_meter_per_second):
     v_meter_per_minute = v_meter_per_second * 60
     wheel_rpm = v_meter_per_minute / config.WHEEL_CIRCUMFERENCE

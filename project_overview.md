@@ -328,6 +328,20 @@ Serves on `http://<LOCAL_IP>:5000`. Shares `AMRState`, `SequenceEngine`, and
 
 ---
 
+### PID auto-tune — `autotune.py` (ported from AGV Kayaba)
+
+Started from the PARAMS page (AGV in ARMED on a straight tape, area clear). Mode
+`autotune`: warm-up on the current gains up to the HIGH or SLOW speed, then a relay
+test (±relay rpm steering) makes the AGV weave; a model `pv'' = Kg·(u(t−T) + τL·u'(t−T))`
+is fitted and three PD gain sets (calm / recommended / responsive) are proposed.
+APPLY writes them through `/api/params/tuning`. Aborts on tape loss, CAN timeout,
+RESET, emergency, MANUAL or STOP. RFID tags are ignored while it runs
+(`rfid_processor.py`). Needs `kinematics.SENSOR_LOOKAHEAD_M` (axle → front sensor).
+
+Live tuning (PARAMS page, and auto-tune APPLY) is **saved** to
+`data/tuning_<AGV_ID>.json` and loaded by `config.py` on boot; RESET TO PROFILE
+deletes the file. The profile JSON itself is never written.
+
 ## 13. Safety, logging, shutdown
 
 - **`safety_watchdog`** polls each watched `SensorDriver`'s `get_health()` every 50 ms; if any exceeds its timeout it sets `system_error` and immediately zeros AO 0/1. `mode_manager` then brakes and holds until recovery. Watched: DI (`WATCHDOG_DI_TIMEOUT_S`), CAN, RFID.

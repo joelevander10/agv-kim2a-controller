@@ -95,6 +95,9 @@ RPM_VOLT_OFFSET_RIGHT = _params["hardware"].get("RPM_VOLT_OFFSET_RIGHT", RPM_VOL
 WHEEL_DIAMETER      = _params["kinematics"]["WHEEL_DIAMETER"]
 GEAR_RATIO          = _params["kinematics"]["GEAR_RATIO"]
 WHEEL_CIRCUMFERENCE = 3.14159 * WHEEL_DIAMETER
+# Distance from the drive-wheel axle forward to the front MGS1600 (m). Used by
+# the PID auto-tune (autotune.py) to separate sensor look-ahead from drive lag.
+SENSOR_LOOKAHEAD_M  = float(_params["kinematics"].get("SENSOR_LOOKAHEAD_M", 0.076))
 
 # ── Speeds ────────────────────────────────────────────────────────────────────
 MANUAL_TARGET_HIGH_SPEED     = _params["speeds"]["MANUAL_TARGET_HIGH_SPEED"]
@@ -386,3 +389,31 @@ TUNABLE_SPECS = {   # key: (min, max)
 # Snapshot for "reset to profile". Captured after _validate(), so it reflects the
 # profile exactly, including every .get() fallback default.
 TUNABLE_DEFAULTS = {k: globals()[k] for k in TUNABLE_SPECS}
+
+# ── Saved tuning (PARAMS page APPLY / auto-tune APPLY) ────────────────────────
+# Every tunable that differs from the profile is written to this file by the
+# web server, and loaded here on boot so it survives a restart. RESET TO
+# PROFILE on the PARAMS page deletes it. Lives in data/ (not tracked by git).
+TUNING_SAVE_FILE = os.environ.get(
+    "AGV_TUNING_FILE", os.path.join(_dir, "data", f"tuning_{AGV_ID}.json"))
+TUNING_SAVED = {}
+try:
+    with open(TUNING_SAVE_FILE, "r") as _f:
+        _saved = json.load(_f)
+    for _k, _v in (_saved.get("values", {}) if isinstance(_saved, dict) else {}).items():
+        if _k in TUNABLE_SPECS:
+            _lo, _hi = TUNABLE_SPECS[_k]
+            try:
+                _v = float(_v)
+            except (TypeError, ValueError):
+                continue
+            if _lo <= _v <= _hi:
+                globals()[_k] = _v
+                TUNING_SAVED[_k] = _v
+    if TUNING_SAVED:
+        print(f"Saved tuning loaded from {TUNING_SAVE_FILE}: "
+              + ", ".join(f"{k}={v}" for k, v in sorted(TUNING_SAVED.items())))
+except FileNotFoundError:
+    pass
+except (OSError, ValueError) as _e:
+    print(f"WARNING: saved tuning {TUNING_SAVE_FILE} ignored ({_e})")

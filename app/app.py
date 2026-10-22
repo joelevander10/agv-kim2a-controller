@@ -528,13 +528,39 @@ def _tuning_guard():
     if _state is None:
         return {"error": "state not initialised"}, 503
     mode = _state.current_mode
-    if mode in ("running", "emergency"):
+    if mode in ("running", "emergency", "autotune"):
         return {"error": f"Cannot change tuning while AGV is {mode}"}, 403
     return None
 
 
 def _tuning_values(config):
     return {k: getattr(config, k) for k in config.TUNABLE_SPECS}
+
+
+def _save_tuning(config):
+    """Persist every tunable that differs from the profile to
+    config.TUNING_SAVE_FILE (atomic write), so it is the default after a
+    restart. Nothing differs -> the file is removed. Returns (ok, error)."""
+    import json
+    path = config.TUNING_SAVE_FILE
+    values = {k: getattr(config, k) for k in config.TUNABLE_SPECS
+              if getattr(config, k) != config.TUNABLE_DEFAULTS[k]}
+    try:
+        if not values:
+            if os.path.exists(path):
+                os.remove(path)
+        else:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump({"saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                           "values": values}, f, indent=2, sort_keys=True)
+            os.replace(tmp, path)
+        config.TUNING_SAVED = values
+        return True, None
+    except OSError as e:
+        logger.error("TUNING: could not save to %s — %s", path, e)
+        return False, str(e)
 
 
 @app.route("/api/params/tuning", methods=["GET", "POST"])
@@ -547,7 +573,8 @@ def api_tuning():
             "values":   _tuning_values(config),
             "specs":    {k: list(v) for k, v in config.TUNABLE_SPECS.items()},
             "defaults": config.TUNABLE_DEFAULTS,
-            "locked":   mode in ("running", "emergency"),
+            "saved":    sorted(config.TUNING_SAVED),
+            "locked":   mode in ("running", "emergency", "autotune"),
         })
 
     err = _tuning_guard()
@@ -578,9 +605,11 @@ def api_tuning():
     for k, v in updates.items():
         setattr(config, k, v)
 
-    logger.info("TUNING: applied %s",
+    saved, save_err = _save_tuning(config)
+    logger.info("TUNING: applied%s %s", " and saved" if saved else " (NOT saved)",
                 ", ".join(f"{k}={v}" for k, v in sorted(updates.items())))
     return jsonify({"ok": True, "applied": sorted(updates),
+                    "saved": saved, "save_error": save_err,
                     "values": _tuning_values(config)})
 
 
@@ -595,8 +624,10 @@ def api_tuning_reset():
     for k, v in config.TUNABLE_DEFAULTS.items():
         setattr(config, k, v)
 
+    saved, save_err = _save_tuning(config)      # nothing differs -> file removed
     logger.info("TUNING: reset all tunable parameters to profile defaults")
-    return jsonify({"ok": True, "values": _tuning_values(config)})
+    return jsonify({"ok": True, "saved": saved, "save_error": save_err,
+                    "values": _tuning_values(config)})
 
 
 _RESTART_CMD = ["/usr/bin/systemctl", "restart", "agv-controller.service"]
@@ -698,6 +729,56 @@ def api_calibration_status():
             "age_s":     round(enc_age, 2) if enc_age is not None else None,
         },
     })
+
+
+# ── PID auto-tune (relay test, see autotune.py) ─────────────────────────────
+
+@app.route("/api/autotune", methods=["GET"])
+def api_autotune_status():
+    if _state is None:
+        return jsonify({"error": "state not initialised"}), 503
+    return jsonify({"mode": _state.current_mode, "running": _state.current_mode == "autotune",
+                    **_state.autotune_status})
+
+
+@app.route("/api/autotune/start", methods=["POST"])
+def api_autotune_start():
+    import autotune, math
+    if _state is None:
+        return jsonify({"error": "state not initialised"}), 503
+    if _state.current_mode != "armed":
+        return jsonify({"error": f"Auto-tune starts only from ARMED (now {_state.current_mode})"}), 403
+    raw = _state.latest_sensor
+    if not (raw and raw.get("tape_detected")):
+        return jsonify({"error": "no tape under the front sensor"}), 409
+    data = request.get_json(silent=True) or {}
+    mode = str(data.get("speed_mode", "HIGH")).upper()
+    if mode not in autotune.MODE_INFO:
+        return jsonify({"error": f"speed_mode must be one of {sorted(autotune.MODE_INFO)}"}), 400
+    limits = {"relay_rpm": (5, 400), "err_limit_mm": (10, 90), "max_s": (5, 120), "cycles": (2, 10)}
+    params = {"speed_mode": mode}
+    for k, (lo, hi) in limits.items():
+        try:
+            v = float(data.get(k, autotune.DEFAULTS[k]))
+        except (TypeError, ValueError):
+            return jsonify({"error": f"{k} must be a number"}), 400
+        if not (math.isfinite(v) and lo <= v <= hi):
+            return jsonify({"error": f"{k} must be in [{lo}, {hi}]"}), 400
+        params[k] = v
+    _state.autotune_params = params
+    _state.autotune_status.update(autotune.new_status())
+    _state.autotune_status["phase"] = "starting"
+    _state.autotune_request = True
+    logger.warning("[AUTOTUNE] start requested via HMI: %s", params)
+    return jsonify({"ok": True, "params": params})
+
+
+@app.route("/api/autotune/stop", methods=["POST"])
+def api_autotune_stop():
+    if _state is None:
+        return jsonify({"error": "state not initialised"}), 503
+    _state.autotune_request = False
+    return jsonify({"ok": True})
 
 
 @app.route("/api/calibration/start", methods=["POST"])

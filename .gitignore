@@ -8,3 +8,5 @@ __pycache__/
 logs/
 analysis_plot/
 .DS_Store
+# Saved live tuning (PARAMS page / auto-tune APPLY) — per AGV, not in git
+data/

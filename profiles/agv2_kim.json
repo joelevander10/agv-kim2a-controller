@@ -48,7 +48,8 @@
 
   "kinematics": {
     "WHEEL_DIAMETER": 0.18,
-    "GEAR_RATIO": 30
+    "GEAR_RATIO": 30,
+    "SENSOR_LOOKAHEAD_M": 0.076
   },
 
   "speeds": {

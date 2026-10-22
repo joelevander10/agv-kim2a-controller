@@ -130,6 +130,12 @@ class AMRState:
             "csv_path": None,
         }
 
+        # ── PID auto-tune (autotune.py), started from the PARAMS page ─────────
+        self.autotune_request = False   # set by Flask; cleared when the test ends
+        self.autotune_params  = {}      # speed_mode, relay_rpm, err_limit_mm, max_s, cycles
+        self.autotune_status  = {"phase": "idle", "message": "", "cycles": 0,
+                                 "elapsed_s": 0.0, "params": {}, "result": None}
+
         # ── Typed domains ──────────────────────────────────────────────────────
         self.system     = SystemState()
         self.kinematic  = KinematicState()

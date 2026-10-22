@@ -55,6 +55,12 @@ async def rfid_processor(state, engine):
         state.latest_rfid_tag = tag
         logger.debug("[RFID] Tag read: %s", tag)
 
+        # PID auto-tune drives its own test — tags (speed zones, set_track,
+        # stops) must not change anything underneath it.
+        if state.current_mode == "autotune":
+            logger.debug("[RFID] Tag %s ignored — auto-tune running", tag)
+            continue
+
         required_target = tag_targets.get(tag)
         if required_target is not None and required_target != state.selected_fork_target:
             logger.debug(
