@@ -306,13 +306,13 @@
       "category": "sequence",
       "trigger": {
         "type": "rfid_then_marker",
-        "rfid_tag": "009A",
+        "rfid_tag": "00CD",
         "marker_side": "prox",
         "approach_timeout": 15.0
       },
       "actions": [
         { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
+        { "type": "wait_marker",      "side": "prox", "timeout": 30.0 },
         { "type": "stop_agv" },
         { "type": "plc_request",      "seq_num": 2, "pulse_duration": 1.0 },
         { "type": "wait_plc_complete","seq_num": 2, "clear_timeout": 5.0, "done_timeout": 30.0 },
