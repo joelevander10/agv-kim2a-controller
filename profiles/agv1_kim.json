@@ -295,7 +295,7 @@
         { "type": "wait_seconds",     "duration": 1.0 },
         { "type": "plc_request",      "seq_num": 0, "pulse_duration": 1.0 },
         { "type": "wait_plc_complete","seq_num": 0, "clear_timeout": 10.0 },
-        { "type": "resume",           "speed": "HIGH" }
+        { "type": "resume",           "speed": "SLOW" }
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
@@ -317,7 +317,7 @@
         { "type": "plc_request",      "seq_num": 1, "pulse_duration": 1.0 },
         { "type": "wait_plc_complete","seq_num": 1, "clear_timeout": 5.0, "done_timeout": 60.0 },
         { "type": "wait_seconds",     "duration": 1.0 },
-        { "type": "resume",           "speed": "HIGH" }
+        { "type": "resume",           "speed": "SLOW" }
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
@@ -337,7 +337,7 @@
         { "type": "stop_agv" },
         { "type": "plc_request",      "seq_num": 2, "pulse_duration": 1.0 },
         { "type": "wait_plc_complete","seq_num": 2, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
+        { "type": "resume",           "speed": "SLOW" }
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
