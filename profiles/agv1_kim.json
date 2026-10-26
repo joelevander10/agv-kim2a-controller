@@ -195,6 +195,7 @@
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00AA", "requires_target": "point_1" },
       "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false },
         { "type": "set_track", "side": "right" }
       ],
       "cooldown_s": 5.0,
@@ -206,6 +207,7 @@
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00AB", "requires_target": "point_2" },
       "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false },
         { "type": "set_track", "side": "right" }
       ],
       "cooldown_s": 5.0,
@@ -217,6 +219,7 @@
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00AC", "requires_target": "point_3" },
       "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false },
         { "type": "set_track", "side": "right" }
       ],
       "cooldown_s": 5.0,
@@ -228,6 +231,7 @@
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00AD", "requires_target": "point_4" },
       "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false },
         { "type": "set_track", "side": "right" }
       ],
       "cooldown_s": 5.0,
@@ -239,6 +243,7 @@
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00AE", "requires_target": "point_5" },
       "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false },
         { "type": "set_track", "side": "right" }
       ],
       "cooldown_s": 5.0,
@@ -261,6 +266,7 @@
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00BA" },
       "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false },
         { "type": "set_track", "side": "right" }
       ],
       "cooldown_s": 5.0,

@@ -337,8 +337,10 @@ class SequenceEngine:
         self._state.speed_mode = p["speed"]
         # Only a NAV sequence setting SLOW means "we are in a corner" — seq
         # approaches may also use SLOW but must not get curvature feedforward.
+        # "corner": false (e.g. branch / fork tags) slows down WITHOUT the
+        # corner feedforward, which is tuned for the main loop's left curves.
         if self._category(self._current_seq) == "navigation":
-            self._state.nav_in_corner = (p["speed"] == "SLOW")
+            self._state.nav_in_corner = (p["speed"] == "SLOW" and p.get("corner", True))
         else:
             self._state.nav_in_corner = False
         logger.info("[SEQ] Speed → %s", p["speed"])

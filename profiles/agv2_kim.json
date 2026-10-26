@@ -1,21 +1,21 @@
 {
-  "_agv_id": "agv2_kim",
-  "_description": "AGV2 KIM2A — primary unit",
+  "_agv_id": "agv1_kim",
+  "_description": "AGV1 KIM2A — primary unit",
 
   "networking": {
-    "LOCAL_IP": "192.168.2.20",
+    "LOCAL_IP": "192.168.2.100",
     "DIO_IP": "192.168.1.31",
     "AO_IP": "192.168.1.30",
     "MODBUS_PORT": 502,
     "DEVICE_ID": 1,
-    "RFID_IP": "192.168.3.200",
+    "RFID_IP": "192.168.5.10",
     "RFID_PORT": 2022,
     "SLMP_IP": "192.168.4.10",
     "SLMP_PORT": 1280
   },
 
   "io_mapping": {
-    "DI_FLIPPED": 1,
+    "DI_FLIPPED": 0,
     "DI_BASE": 0,
     "DO_BASE": 0,
     "NUM_DI": 16,
@@ -30,21 +30,25 @@
     "PENDANT_ENABLED": false,
     "DI_MODE_SWITCH": 2,
     "DI_START": 0,
-    "DI_RESET": 1
+    "DI_RESET": 1,
+    "DI_PROX": 8
   },
 
   "motor_channels": {
-    "_comment": "DO and AO channel indices for each motor drive",
-    "left":  { "do_fwd": 0, "do_rev": 1, "do_brake": 2, "do_alarm": 3, "ao_speed": 0 },
-    "right": { "do_fwd": 4, "do_rev": 5, "do_brake": 6, "do_alarm": 7, "ao_speed": 1 }
+    "left":  { "do_fwd": 0, "do_rev": 1, "do_brake": 2, "do_alarm": 888, "ao_speed": 0 },
+    "right": { "do_fwd": 3, "do_rev": 4, "do_brake": 5, "do_alarm": 888, "ao_speed": 1 }
   },
 
   "hardware": {
     "V_RANGE": 10.0,
     "DAC_RES": 4095,
-    "_comment_cal": "Motor speed calibration: rpm = RPM_PER_VOLT * volts + RPM_VOLT_OFFSET",
-    "RPM_PER_VOLT": 646.59,
-    "RPM_VOLT_OFFSET": -101.2
+    "_comment_cal": "2026-10-26 REMAP: on the floor the AGV drove at HALF the commanded speed (1 m/s set = 0.5 m/s real), so every value here was halved (matches the old fit 646.59/-101.2). The 2026-05-30 encoder run over-read speed 2x - check encoder COUNTS_PER_REV / WHEEL_DIAMETER_M before running the wheel calibration again. Previous note: Per-wheel motor cal from encoder run 2026-05-30 (rpm=RPM_PER_VOLT*V+OFFSET, R2=0.99 for V>=0.55). Old single fit 646.59/-101.2 was ~2x too low. Shared keys kept as fallback.",
+    "RPM_PER_VOLT": 632.85,
+    "RPM_VOLT_OFFSET": -160.7,
+    "RPM_PER_VOLT_LEFT": 647.5,
+    "RPM_VOLT_OFFSET_LEFT": -177.1,
+    "RPM_PER_VOLT_RIGHT": 644.9,
+    "RPM_VOLT_OFFSET_RIGHT": -149.55
   },
 
   "kinematics": {
@@ -54,43 +58,52 @@
   },
 
   "speeds": {
-    "MANUAL_TARGET_HIGH_SPEED": 0.4,
-    "MANUAL_TARGET_SLOW_SPEED": 0.2,
-    "_comment_balance": "WHEEL_BALANCE_PCT: keseimbangan roda (%) untuk MANUAL dan AUTO. Positif = roda kiri diperlambat / kanan dipercepat (untuk AGV yang condong ke kanan). Negatif = sebaliknya. Auto-tune menyarankan nilainya; bisa diubah live di PARAMS > LIVE TUNING.",
-    "WHEEL_BALANCE_PCT": 0,
-    "AUTO_TARGET_HIGH_SPEED": 0.40,
-    "AUTO_TARGET_SLOW_SPEED": 0.20,
+    "MANUAL_TARGET_HIGH_SPEED": 0.5,
+    "MANUAL_TARGET_SLOW_SPEED": 0.25,
+    "_comment_trim": "MANUAL_TRIM_PCT: koreksi jalan lurus di MANUAL (%). Positif = roda kiri diperlambat / kanan dipercepat -> AGV belok kiri (untuk AGV yang condong ke kanan). Negatif = sebaliknya. Bisa diubah live di PARAMS > LIVE TUNING.",
+    "MANUAL_TRIM_PCT": 0,
+    "AUTO_TARGET_HIGH_SPEED": 0.8,
+    "AUTO_TARGET_SLOW_SPEED": 0.09,
+    "AUTO_TARGET_APPROACH_SPEED": 0.09,
     "AUTO_TARGET_MEDIUM_SPEED": 0.5,
     "AUTO_TARGET_MAX_SPEED": 1.0,
-    "AUTO_TARGET_EXTRA_SLOW_SPEED": 0.15,
-    "ACCEL_RATE": 0.8
+    "ACCEL_RATE": 0.25,
+    "DECEL_RATE": 1.5,
+    "APPROACH_DECEL_RATE": 0.2
   },
 
   "pid_tuning": {
-    "_comment_high": "HIGH speed gains — tuned for 0.4m/s with loaded trolley",
-    "KP": 1.4,
-    "TD": 0.12,
+    "_comment_high": "HIGH gains — retuned for 0.6 m/s (was 0.32 m/s: KP=2.8, TD=0.26, V_RED_COEF=2.8, clamp=1000). Start point only — verify on the physical track and adjust.",
+    "KP": 1.15,
+    "TD": 0.30,
     "N": 20,
-    "_comment_slow": "SLOW / EXTRA_SLOW gains — tuned for 0.25m/s, proven stable",
-    "KP_SLOW": 2.2,
-    "TD_SLOW": 0.14,
+    "_comment_slow": "SLOW/corner gains",
+    "KP_SLOW": 1.3,
+    "TD_SLOW": 0.16,
     "N_SLOW": 12,
     "_comment_medium_max": "MEDIUM (0.5 m/s) and MAX (1.0 m/s) gains — start = copy of the HIGH gains; tune with PARAMS > PID AUTO-TUNE.",
-    "KP_MEDIUM": 1.4, "TD_MEDIUM": 0.12, "N_MEDIUM": 20,
-    "KP_MAX": 1.4, "TD_MAX": 0.12, "N_MAX": 20,
-    "_comment_shared": "Shared — integral and timing constants",
-    "TI": 20,
-    "TI_DEADBAND": 25,
-    "TI_MAX": 500,
+    "KP_MEDIUM": 1.15, "TD_MEDIUM": 0.3, "N_MEDIUM": 20,
+    "KP_MAX": 1.15, "TD_MAX": 0.3, "N_MAX": 20,
+    "_comment_approach": "APPROACH gains — 0.2 m/s station crawl. The approach is guided by a one-sided physical bar on the AGV's RIGHT; tape is straight here so the PID needs little authority. Asymmetric clamp: INTO_BAR (positive output = yaw right into the bar) held tight at 8 rpm so the bar centers the AGV mechanically instead of the PID over-pressing the bearings; AWAY (off the bar) kept at 80 rpm for recovery. INTO_BAR is the tuning dial — lower toward 0 if it still binds, raise if it drifts left off the bar.",
+    "KP_APPROACH": 0.225,
+    "TD_APPROACH": 0.2,
+    "N_APPROACH": 10,
+    "OUTPUT_CLAMP_INTO_BAR_APPROACH": 4,
+    "OUTPUT_CLAMP_AWAY_APPROACH": 40,
+    "_comment_shared": "Shared — integral and timing constants. TI/deadband lowered to null corner standing bias faster at higher speed.",
+    "TI": 25,
+    "TI_DEADBAND": 20,
+    "TI_MAX": 400,
     "DT": 0.01,
     "_comment_sr": "Speed reduction coefficients — split by speed mode",
-    "V_RED_COEF": 4,
-    "V_RED_COEF_SLOW": 2,
-    "V_RED_COEF_MEDIUM": 4,
-    "V_RED_COEF_MAX": 4,
-    "OUTPUT_CLAMP_RPM": 800,
+    "V_RED_COEF": 1.8,
+    "V_RED_COEF_SLOW": 1.0,
+    "V_RED_COEF_MEDIUM": 1.8,
+    "V_RED_COEF_MAX": 1.8,
+    "V_RED_COEF_APPROACH": 0.2,
+    "OUTPUT_CLAMP_RPM": 650,
     "SR_ALPHA": 0.15,
-    "SR_CAP": 0.55
+    "SR_CAP": 0.45
   },
 
   "can_sensor": {
@@ -111,20 +124,42 @@
     "SEQUENCE_STOP_DELAY": 4.0
   },
 
+  "encoder": {
+    "_comment": "CANopen friction-wheel encoder for wheel-speed calibration. Multi-turn: TPDO1 maps 0x6004 (24-bit), wraps at TOTAL_RANGE not per-rev. WHEEL_DIAMETER_M is the encoder friction wheel contact diameter; v_ground = omega_enc * (WHEEL_DIAMETER_M/2).",
+    "ENABLED": 1,
+    "NODE_ID": 1,
+    "BITRATE": 125000,
+    "COUNTS_PER_REV": 4096,
+    "TOTAL_RANGE": 16777216,
+    "WHEEL_DIAMETER_M": 0.060,
+    "TPDO_COB_ID_BASE": 384
+  },
+
+  "calibration": {
+    "_comment": "Open-loop straight ramp for input-vs-actual wheel speed. Shortened ramp (0->0.5 m/s, 2s dwell) to fit ~13 m of straight track.",
+    "V_START": 0.0,
+    "V_STEP": 0.01,
+    "V_MAX": 0.25,
+    "DWELL_S": 2.0
+  },
+
   "feedforward": {
-    "_comment": "Curvature feedforward for corners (disabled until tuned for this unit's track).",
-    "ENABLED": 0,
+    "_comment": "Curvature feedforward for corners: output_ff = FF_SCALE*sign*0.5*base_rpm*(TRACK_WIDTH_M/CURVE_RADIUS_M), applied while speed_mode is a curve mode. Stadium is CCW => all left turns. FF_SCALE=0.5 halves the compensation (2026-05-30).",
+    "ENABLED": 1,
     "TRACK_WIDTH_M": 0.46,
     "CURVE_RADIUS_M": 1.5,
     "CURVE_DIRECTION": "left",
     "CURVE_SPEED_MODES": ["SLOW"],
-    "FF_ALPHA": 0.15
+    "FF_ALPHA": 0.15,
+    "FF_EXIT_ALPHA": 0.6,
+    "FF_SCALE": 0.85
   },
 
   "sequences": [
     {
       "_comment": "Slow down zone — RFID-only trigger",
       "name": "speed_zone_slow",
+      "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "0014" },
       "actions": [
         { "type": "set_speed", "speed": "SLOW" }
@@ -135,6 +170,7 @@
     {
       "_comment": "Resume high speed — RFID-only trigger",
       "name": "speed_zone_high",
+      "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "0016" },
       "actions": [
         { "type": "set_speed", "speed": "HIGH" }
@@ -143,8 +179,97 @@
       "requires_mode": "running"
     },
     {
+      "_comment": "Slow down zone (alt tag) — RFID-only trigger",
+      "name": "speed_zone_slow_alt",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "001C" },
+      "actions": [
+        { "type": "set_speed", "speed": "SLOW" }
+      ],
+      "cooldown_s": 0.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 1 — hanya jalan kalau operator pilih target ini di HMI homepost. Tag placeholder: replace 00AA with the scanned tag.",
+      "name": "fork_to_point1",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AA", "requires_target": "point_1" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 2. Tag placeholder: replace 00AB with the scanned tag.",
+      "name": "fork_to_point2",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AB", "requires_target": "point_2" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 3. Tag placeholder: replace 00AC with the scanned tag.",
+      "name": "fork_to_point3",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AC", "requires_target": "point_3" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 4. Tag placeholder: replace 00AD with the scanned tag.",
+      "name": "fork_to_point4",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AD", "requires_target": "point_4" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Fork ke titik 5. Tag placeholder: replace 00AE with the scanned tag.",
+      "name": "fork_to_point5",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00AE", "requires_target": "point_5" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "After the merge back onto the main loop — revert to the default LEFT track. No requires_target: always runs regardless of which point was selected. Tag placeholder: replace 00BB with the scanned tag.",
+      "name": "fork_merge_revert",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00BB" },
+      "actions": [
+        { "type": "set_track", "side": "left" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Tag BA — follow the RIGHT track from here (always, no CABANG check). Track stays RIGHT until a set_track left tag (e.g. 00BB) or RESET.",
+      "name": "track_right_BA",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00BA" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
       "_comment": "Timed checkpoint stop — RFID-only trigger",
       "name": "checkpoint_stop",
+      "category": "sequence",
       "trigger": { "type": "rfid", "rfid_tag": "000C" },
       "actions": [
         { "type": "sequence_stop", "duration": 4.0 }
@@ -153,116 +278,66 @@
       "requires_mode": "running"
     },
     {
-      "_comment": "Trolley load sequence 0 — RFID arms approach, left marker executes",
+      "_comment": "Trolley load 0 — RFID arms APPROACH deceleration (0.1 m/s crawl); DI08 magnetic proximity marker triggers the stop.",
       "name": "trolley_load_00",
+      "category": "sequence",
       "trigger": {
         "type": "rfid_then_marker",
-        "rfid_tag": "0096",
-        "marker_side": "left",
-        "approach_timeout": 15.0
+        "rfid_tag": "00CC",
+        "marker_side": "prox",
+        "approach_timeout": 45.0,
+        "approach_speed": "APPROACH"
       },
       "actions": [
-        { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
+        { "type": "set_speed",        "speed": "APPROACH" },
+        { "type": "wait_marker",      "side": "prox", "timeout": 45.0 },
         { "type": "stop_agv" },
+        { "type": "wait_seconds",     "duration": 1.0 },
         { "type": "plc_request",      "seq_num": 0, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 0, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
+        { "type": "wait_plc_complete","seq_num": 0, "clear_timeout": 10.0 },
+        { "type": "resume",           "speed": "SLOW" }
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
     },
     {
       "name": "trolley_load_01",
+      "category": "sequence",
       "trigger": {
         "type": "rfid_then_marker",
-        "rfid_tag": "0098",
-        "marker_side": "left",
-        "approach_timeout": 15.0
+        "rfid_tag": "0078",
+        "marker_side": "prox",
+        "approach_timeout": 30.0
       },
       "actions": [
-        { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
+        { "type": "set_speed",        "speed": "APPROACH" },
+        { "type": "wait_marker",      "side": "prox", "timeout": 30.0 },
         { "type": "stop_agv" },
+        { "type": "wait_seconds",     "duration": 1.0 },
         { "type": "plc_request",      "seq_num": 1, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 1, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
+        { "type": "wait_plc_complete","seq_num": 1, "clear_timeout": 5.0, "done_timeout": 60.0 },
+        { "type": "wait_seconds",     "duration": 1.0 },
+        { "type": "resume",           "speed": "SLOW" }
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
     },
     {
       "name": "trolley_load_02",
+      "category": "sequence",
       "trigger": {
         "type": "rfid_then_marker",
-        "rfid_tag": "009A",
-        "marker_side": "left",
+        "rfid_tag": "00CD",
+        "marker_side": "prox",
         "approach_timeout": 15.0
       },
       "actions": [
         { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
+        { "type": "wait_marker",      "side": "prox", "timeout": 30.0 },
         { "type": "stop_agv" },
         { "type": "plc_request",      "seq_num": 2, "pulse_duration": 1.0 },
         { "type": "wait_plc_complete","seq_num": 2, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
-      ],
-      "cooldown_s": 10.0,
-      "requires_mode": "running"
-    },
-    {
-      "name": "trolley_load_03",
-      "trigger": {
-        "type": "rfid_then_marker",
-        "rfid_tag": "009C",
-        "marker_side": "left",
-        "approach_timeout": 15.0
-      },
-      "actions": [
-        { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
-        { "type": "stop_agv" },
-        { "type": "plc_request",      "seq_num": 3, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 3, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
-      ],
-      "cooldown_s": 10.0,
-      "requires_mode": "running"
-    },
-    {
-      "name": "trolley_load_04",
-      "trigger": {
-        "type": "rfid_then_marker",
-        "rfid_tag": "009E",
-        "marker_side": "left",
-        "approach_timeout": 15.0
-      },
-      "actions": [
-        { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
-        { "type": "stop_agv" },
-        { "type": "plc_request",      "seq_num": 4, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 4, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
-      ],
-      "cooldown_s": 10.0,
-      "requires_mode": "running"
-    },
-    {
-      "name": "trolley_load_05",
-      "trigger": {
-        "type": "rfid_then_marker",
-        "rfid_tag": "00A0",
-        "marker_side": "left",
-        "approach_timeout": 15.0
-      },
-      "actions": [
-        { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "left", "timeout": 15.0 },
-        { "type": "stop_agv" },
-        { "type": "plc_request",      "seq_num": 5, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 5, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "HIGH" }
+        { "type": "resume",           "speed": "SLOW" }
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
@@ -275,7 +350,7 @@
     "CAN_ENABLED":  1,
     "NAV_ENABLED":  1,
     "SEQ_ENABLED":  1,
-    "SLMP_ENABLED": 0
+    "SLMP_ENABLED": 1
   },
 
   "watchdog": {
@@ -283,6 +358,11 @@
     "DI_TIMEOUT_S": 1.0,
     "CAN_TIMEOUT_S": 1.0,
     "RFID_TIMEOUT_S": 5.0
+  },
+
+  "timing": {
+    "_comment": "Hardware poll intervals (seconds). DI at 100 Hz so the prox station marker is fresher for precise stops.",
+    "DI_POLL_INTERVAL": 0.01
   },
 
   "slmp_plc": {
@@ -306,14 +386,6 @@
     "M2016":{ "description": "AGV.REQ.SEQUENCE.6",         "permission": "R/W" },
     "M2017":{ "description": "AGV.REQ.SEQUENCE.7",         "permission": "R/W" },
     "M2018":{ "description": "AGV.REQ.SEQUENCE.8",         "permission": "R/W" },
-    "M2019":{ "description": "AGV.REQ.SEQUENCE.9",         "permission": "R/W" },
-    "M2020":{ "description": "AGV.REQ.SEQUENCE.10",        "permission": "R/W" },
-    "M2021":{ "description": "AGV.REQ.SEQUENCE.11",        "permission": "R/W" },
-    "M2022":{ "description": "AGV.REQ.SEQUENCE.12",        "permission": "R/W" },
-    "M2023":{ "description": "AGV.REQ.SEQUENCE.13",        "permission": "R/W" },
-    "M2024":{ "description": "AGV.REQ.SEQUENCE.14",        "permission": "R/W" },
-    "M2025":{ "description": "AGV.REQ.SEQUENCE.15",        "permission": "R/W" },
-    "M2026":{ "description": "AGV.REQ.SEQUENCE.16",        "permission": "R/W" },
     "M2040":{ "description": "SEQUENCE.0.COMPLETE",        "permission": "R" },
     "M2041":{ "description": "SEQUENCE.1.COMPLETE",        "permission": "R" },
     "M2042":{ "description": "SEQUENCE.2.COMPLETE",        "permission": "R" },
@@ -322,22 +394,61 @@
     "M2045":{ "description": "SEQUENCE.5.COMPLETE",        "permission": "R" },
     "M2046":{ "description": "SEQUENCE.6.COMPLETE",        "permission": "R" },
     "M2047":{ "description": "SEQUENCE.7.COMPLETE",        "permission": "R" },
-    "M2048":{ "description": "SEQUENCE.8.COMPLETE",        "permission": "R" },
-    "M2049":{ "description": "SEQUENCE.9.COMPLETE",        "permission": "R" },
-    "M2050":{ "description": "SEQUENCE.10.COMPLETE",       "permission": "R" },
-    "M2051":{ "description": "SEQUENCE.11.COMPLETE",       "permission": "R" },
-    "M2052":{ "description": "SEQUENCE.12.COMPLETE",       "permission": "R" },
-    "M2053":{ "description": "SEQUENCE.13.COMPLETE",       "permission": "R" },
-    "M2054":{ "description": "SEQUENCE.14.COMPLETE",       "permission": "R" },
-    "M2055":{ "description": "SEQUENCE.15.COMPLETE",       "permission": "R" },
-    "M2056":{ "description": "SEQUENCE.16.COMPLETE",       "permission": "R" }
+    "M2048":{ "description": "SEQUENCE.8.COMPLETE",        "permission": "R" }
+  },
+
+  "slmp_manual": {
+    "_comment": "Manual trolley control registers — available in AGV MANUAL mode only",
+    "M2212": { "description": "MAN REQ PUSHER EXTEND",        "permission": "R/W", "ui": "button" },
+    "M2213": { "description": "MAN REQ PUSHER RETRACT",       "permission": "R/W", "ui": "button" },
+    "M2104": { "description": "MAN REQ TOP CONV FWD",         "permission": "R/W", "ui": "button" },
+    "M2105": { "description": "MAN REQ TOP CONV RVS",         "permission": "R/W", "ui": "button" },
+    "M2106": { "description": "MAN REQ TOP CONV CLR",         "permission": "R/W", "ui": "button" },
+    "M2107": { "description": "MAN REQ TOP CONV BRK",         "permission": "R/W", "ui": "button" },
+    "M2108": { "description": "MAN REQ TOP CONV BRK LATCH",   "permission": "R",   "ui": "lamp-amber" },
+    "M2109": { "description": "MAN REQ TOP CONV BRK RELEASE", "permission": "R/W", "ui": "button" },
+    "M2124": { "description": "MAN REQ BOTTOM CONV FWD",      "permission": "R/W", "ui": "button" },
+    "M2125": { "description": "MAN REQ BOTTOM CONV RVS",      "permission": "R/W", "ui": "button" },
+    "M2126": { "description": "MAN REQ BOTTOM CONV CLR",      "permission": "R/W", "ui": "button" },
+    "M2127": { "description": "MAN REQ BOTTOM CONV BRK",      "permission": "R/W", "ui": "button" },
+    "M2128": { "description": "MAN REQ BOTTOM CONV BRK LATCH","permission": "R",   "ui": "lamp-amber" },
+    "M2129": { "description": "MAN REQ BOTTOM CONV BRK RELEASE","permission":"R/W", "ui": "button" },
+    "Y0":    { "description": "TOP CONV FWD",                 "permission": "R",   "ui": "lamp-amber" },
+    "Y1":    { "description": "TOP CONV RVS",                 "permission": "R",   "ui": "lamp-amber" },
+    "Y2":    { "description": "TOP CONV CLEAR ERROR",         "permission": "R",   "ui": "lamp-amber" },
+    "Y3":    { "description": "TOP CONV BRAKE",               "permission": "R",   "ui": "lamp-amber" },
+    "Y4":    { "description": "BOTTOM CONV FWD",              "permission": "R",   "ui": "lamp-amber" },
+    "Y5":    { "description": "BOTTOM CONV RVS",              "permission": "R",   "ui": "lamp-amber" },
+    "Y6":    { "description": "BOTTOM CONV CLEAR ERROR",      "permission": "R",   "ui": "lamp-amber" },
+    "Y7":    { "description": "BOTTOM CONV BRAKE",            "permission": "R",   "ui": "lamp-amber" },
+    "Y10":   { "description": "BOTTOM PUSHER RED (+)",        "permission": "R",   "ui": "lamp-amber" },
+    "Y11":   { "description": "BOTTOM PUSHER RED (-)",        "permission": "R",   "ui": "lamp-amber" },
+    "Y12":   { "description": "BOTTOM PUSHER BLACK (-)",      "permission": "R",   "ui": "lamp-amber" },
+    "Y13":   { "description": "BOTTOM PUSHER BLACK (+)",      "permission": "R",   "ui": "lamp-amber" },
+    "Y14":   { "description": "TOP PUSHER RED (+)",           "permission": "R",   "ui": "lamp-amber" },
+    "Y15":   { "description": "TOP PUSHER RED (-)",           "permission": "R",   "ui": "lamp-amber" },
+    "Y16":   { "description": "TOP PUSHER BLACK (-)",         "permission": "R",   "ui": "lamp-amber" },
+    "Y17":   { "description": "TOP PUSHER BLACK (+)",         "permission": "R",   "ui": "lamp-amber" },
+    "Y20":   { "description": "PL READY",                     "permission": "R",   "ui": "lamp-amber" },
+    "X0":    { "description": "PB START AUTO",                "permission": "R",   "ui": "lamp-green" },
+    "X1":    { "description": "SS MAN/AUTO",                  "permission": "R",   "ui": "lamp-green" },
+    "X2":    { "description": "EPB TROLLEY",                  "permission": "R",   "ui": "lamp-green" },
+    "X3":    { "description": "[SPARE]",                      "permission": "R",   "ui": "lamp-green" },
+    "X4":    { "description": "PRX1.TOP.FRONT.RIGHT",         "permission": "R",   "ui": "lamp-green" },
+    "X5":    { "description": "PRX2.TOP.REAR.RIGHT",          "permission": "R",   "ui": "lamp-green" },
+    "X6":    { "description": "PRX3.TOP.REAR.LEFT",           "permission": "R",   "ui": "lamp-green" },
+    "X7":    { "description": "PRX4.TOP.FRONT.LEFT",          "permission": "R",   "ui": "lamp-green" },
+    "X10":   { "description": "PRX5.BOT.FRONT.RIGHT",        "permission": "R",   "ui": "lamp-green" },
+    "X11":   { "description": "PRX6.BOT.REAR.RIGHT",         "permission": "R",   "ui": "lamp-green" },
+    "X12":   { "description": "PRX7.BOT.REAR.LEFT",          "permission": "R",   "ui": "lamp-green" },
+    "X13":   { "description": "PRX8.BOT.FRONT.LEFT",         "permission": "R",   "ui": "lamp-green" }
   },
   "rotate": {
     "_comment": "Putar 180° di atas pita magnet (sama dengan AGV Kayaba). Tombol T = kiri (CCW), Y = kanan (CW), atau tombol ROTATE 180° di halaman MANUAL (mode MANUAL/ARMED); tekan T/Y lagi untuk berhenti. Berputar SPEED_MPS, melambat ke CREEP_MPS saat sensor depan menemukan pita lagi, rem saat |posisi| <= CENTER_TOL_MM. Gunakan di pita lurus, jauh dari percabangan/tag.",
     "ENABLED": true,
-    "SPEED_MPS": 0.10,
-    "CREEP_MPS": 0.04,
-    "ACCEL_MPS2": 0.2,
+    "SPEED_MPS": 0.05,
+    "CREEP_MPS": 0.02,
+    "ACCEL_MPS2": 0.1,
     "CENTER_TOL_MM": 5.0,
     "MIN_ANGLE_DEG": 100.0,
     "MAX_ANGLE_DEG": 260.0,
