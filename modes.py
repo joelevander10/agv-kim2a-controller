@@ -317,7 +317,7 @@ async def manual_mode(state):
     While nothing is jogging the wheel brakes are ON (set_brake), not released.
     Emergency is fully owned by mode_manager — this task does not check it."""
     current_motion = None
-    last_rpms      = None   # (rpm_high, rpm_slow) actually commanded
+    last_rpms      = None   # (rpm_high, rpm_slow, trim) actually commanded
 
     while True:
         # Target motor RPM for each speed; motion helpers convert to per-wheel
@@ -368,16 +368,23 @@ async def manual_mode(state):
         # Re-issue on a speed change too, otherwise an edit made while a jog
         # button is held would not take effect until it is released and pressed
         # again.
-        rpms = (rpm_high, rpm_slow)
+        # Straight trim (PARAMS > LIVE TUNING > MANUAL SPEEDS). Manual driving is
+        # open-loop, so if one wheel runs slightly faster the AGV curves. trim > 0
+        # slows the left wheel and speeds the right one (steers LEFT, fixes a drift
+        # to the right); trim < 0 does the opposite. Spins on the spot are not
+        # trimmed. tl / tr scale the left / right wheel.
+        trim = config.MANUAL_TRIM_PCT
+        tl, tr = 1.0 - trim / 200.0, 1.0 + trim / 200.0
+        rpms = (rpm_high, rpm_slow, trim)
         if motion_state != current_motion or rpms != last_rpms:
             if motion_state != current_motion:
                 logger.debug("Manual: %s", motion_state.upper())
-            if   motion_state == "fwd_left":  await motion.set_forward_left(state, rpm_high, rpm_slow)
-            elif motion_state == "fwd_right": await motion.set_forward_right(state, rpm_high, rpm_slow)
-            elif motion_state == "rvs_left":  await motion.set_reverse_left(state, rpm_high, rpm_slow)
-            elif motion_state == "rvs_right": await motion.set_reverse_right(state, rpm_high, rpm_slow)
-            elif motion_state == "forward":   await motion.set_forward(state, rpm_high)
-            elif motion_state == "reverse":   await motion.set_reverse(state, rpm_high)
+            if   motion_state == "fwd_left":  await motion.set_wheels(state,  rpm_slow * tl,  rpm_high * tr)
+            elif motion_state == "fwd_right": await motion.set_wheels(state,  rpm_high * tl,  rpm_slow * tr)
+            elif motion_state == "rvs_left":  await motion.set_wheels(state, -rpm_slow * tl, -rpm_high * tr)
+            elif motion_state == "rvs_right": await motion.set_wheels(state, -rpm_high * tl, -rpm_slow * tr)
+            elif motion_state == "forward":   await motion.set_wheels(state,  rpm_high * tl,  rpm_high * tr)
+            elif motion_state == "reverse":   await motion.set_wheels(state, -rpm_high * tl, -rpm_high * tr)
             elif motion_state == "left":      await motion.set_left(state, rpm_slow)
             elif motion_state == "right":     await motion.set_right(state, rpm_slow)
             elif motion_state == "idle":

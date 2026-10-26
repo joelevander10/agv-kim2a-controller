@@ -105,6 +105,9 @@ SENSOR_LOOKAHEAD_M  = float(_params["kinematics"].get("SENSOR_LOOKAHEAD_M", 0.07
 # ── Speeds ────────────────────────────────────────────────────────────────────
 MANUAL_TARGET_HIGH_SPEED     = _params["speeds"]["MANUAL_TARGET_HIGH_SPEED"]
 MANUAL_TARGET_SLOW_SPEED     = _params["speeds"]["MANUAL_TARGET_SLOW_SPEED"]
+# MANUAL straight trim (%): > 0 slows the left wheel / speeds the right one so the
+# AGV steers left (corrects a drift to the right); < 0 the opposite. 0 = off.
+MANUAL_TRIM_PCT              = float(_params["speeds"].get("MANUAL_TRIM_PCT", 0.0))
 AUTO_TARGET_HIGH_SPEED       = _params["speeds"]["AUTO_TARGET_HIGH_SPEED"]
 AUTO_TARGET_SLOW_SPEED       = _params["speeds"]["AUTO_TARGET_SLOW_SPEED"]
 AUTO_TARGET_APPROACH_SPEED   = _params["speeds"].get("AUTO_TARGET_APPROACH_SPEED", 0.1)
@@ -397,6 +400,7 @@ TUNABLE_SPECS = {   # key: (min, max)
     # Manual speeds
     "MANUAL_TARGET_HIGH_SPEED":       (0.0,   _MAX_SPEED_MPS),
     "MANUAL_TARGET_SLOW_SPEED":       (0.0,   _MAX_SPEED_MPS),
+    "MANUAL_TRIM_PCT":                (-20.0, 20.0),
     # PID gains — HIGH.  N >= 1: the derivative filter coefficient
     # alpha = dt / ((TD / N) + dt) degenerates as N -> 0.
     "KP":                             (0.0,   50.0),

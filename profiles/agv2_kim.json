@@ -56,6 +56,8 @@
   "speeds": {
     "MANUAL_TARGET_HIGH_SPEED": 0.4,
     "MANUAL_TARGET_SLOW_SPEED": 0.2,
+    "_comment_trim": "MANUAL_TRIM_PCT: koreksi jalan lurus di MANUAL (%). Positif = roda kiri diperlambat / kanan dipercepat -> AGV belok kiri (untuk AGV yang condong ke kanan). Negatif = sebaliknya. Bisa diubah live di PARAMS > LIVE TUNING.",
+    "MANUAL_TRIM_PCT": 0,
     "AUTO_TARGET_HIGH_SPEED": 0.40,
     "AUTO_TARGET_SLOW_SPEED": 0.20,
     "AUTO_TARGET_MEDIUM_SPEED": 0.5,
