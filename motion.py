@@ -35,6 +35,14 @@ def keep_steering(left_rpm, right_rpm):
     excess = max(left_rpm - max_rpm("left"), right_rpm - max_rpm("right"), 0.0)
     return left_rpm - excess, right_rpm - excess
 
+def balance(left_rpm, right_rpm):
+    """Wheel balance (config.WHEEL_BALANCE_PCT, all driving modes): scales the
+    left / right wheel so a wheel that runs slightly fast is evened out.
+    > 0 slows the left wheel and speeds the right one (fixes a pull to the
+    RIGHT); < 0 the opposite. Not used for spins on the spot."""
+    b = config.WHEEL_BALANCE_PCT
+    return left_rpm * (1.0 - b / 200.0), right_rpm * (1.0 + b / 200.0)
+
 def mps_to_rpm(v_meter_per_second):
     v_meter_per_minute = v_meter_per_second * 60
     wheel_rpm = v_meter_per_minute / config.WHEEL_CIRCUMFERENCE

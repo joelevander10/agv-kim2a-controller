@@ -256,6 +256,17 @@
       "requires_mode": "running"
     },
     {
+      "_comment": "Tag BA — follow the RIGHT track from here (always, no CABANG check). Track stays RIGHT until a set_track left tag (e.g. 00BB) or RESET.",
+      "name": "track_right_BA",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00BA" },
+      "actions": [
+        { "type": "set_track", "side": "right" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
       "_comment": "Timed checkpoint stop — RFID-only trigger",
       "name": "checkpoint_stop",
       "category": "sequence",

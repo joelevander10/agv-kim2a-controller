@@ -130,7 +130,19 @@ def design(mode, fit, speed):
     return out
 
 
-def build_result(mode, d, h, ts, us, pvs, periods, amps, speed):
+def balance_suggestion(u_bias, base_rpm):
+    """Steady steering the PID needed to run straight during warm-up (u_bias,
+    rpm) -> wheel balance (%) that would remove it. Output u means left =
+    base + u, right = base - u; balance b gives left = base(1 - b/200), so
+    b = -200 u / base. Added to the balance that was active during the test."""
+    if base_rpm <= 0:
+        return None
+    cur = config.WHEEL_BALANCE_PCT
+    sug = max(-20.0, min(20.0, cur - 200.0 * u_bias / base_rpm))
+    return {"bias_rpm": round(u_bias, 1), "current": cur, "suggested": round(sug, 1)}
+
+
+def build_result(mode, d, h, ts, us, pvs, periods, amps, speed, u_bias=0.0):
     fit = fit_model(ts, us, pvs)
     tau_net = fit["tau_l"] - fit["lag"]
     lag_est = max(0.0, config.SENSOR_LOOKAHEAD_M / max(speed, 0.05) - tau_net)
@@ -142,8 +154,8 @@ def build_result(mode, d, h, ts, us, pvs, periods, amps, speed):
         warn.append(f"Model fit is weak (R² {fit['r2']:.2f}) — repeat on a straighter tape or with a bigger relay.")
     if mode == "APPROACH":
         warn.append("APPROACH: valid only if measured on tape WITHOUT the guide bar. In AUTO the "
-                    "+8 rpm into-bar clamp still limits steering toward the bar; check a station "
-                    "stop after APPLY.")
+                    f"+{config.OUTPUT_CLAMP_INTO_BAR_APPROACH:g} rpm into-bar clamp still limits "
+                    "steering toward the bar; check a station stop after APPLY.")
     if lag_est >= 0.35:
         warn.append(f"Drive lag ≈ {lag_est:.2f} s is large — the motor drivers react slowly "
                     "(check the drivers' own accel/decel time setting).")
@@ -155,7 +167,13 @@ def build_result(mode, d, h, ts, us, pvs, periods, amps, speed):
            "lag_s": round(lag_est, 3), "r2": round(fit["r2"], 3),
            "current": {k: getattr(config, k) for k in keys[:3]},
            "suggestions": design(mode, fit, speed) if fit["kg"] > 0 else [],
+           "balance": balance_suggestion(u_bias, motion.mps_to_rpm(speed)),
            "warnings": warn}
+    bal = res["balance"]
+    if bal and abs(bal["suggested"] - bal["current"]) >= 0.5:
+        warn.append(f"The AGV needed a steady {bal['bias_rpm']:+.0f} rpm of steering just to run "
+                    f"straight (one wheel faster). Set Wheel balance to {bal['suggested']:+.1f} % "
+                    f"(now {bal['current']:+.1f} %), then run the auto-tune again.")
     return res
 
 
@@ -189,11 +207,32 @@ async def autotune_mode(state):
     last_cross, prev_e = None, None
     sig_prev_e, sig_prev_t, de_f = None, None, 0.0
     warm_out = []              # PID output while running straight (side-pull bias)
+    bal_samples = []           # wheel balance (%) the warm-up steering implies, at speed
     u_bias = 0.0
     switches = 0
     cyc_max, cyc_min = -1e9, 1e9
     periods, amps = [], []
     ts, us, pvs = [], [], []
+
+    def finish_warmup(phase, message):
+        """Warm-up never got straight (usually a big steady offset from a wheel
+        that runs fast). If it ran at speed long enough, still report the wheel
+        balance that would remove the offset, so the next run can measure."""
+        if len(bal_samples) >= 20:
+            recent = bal_samples[-100:]
+            delta = sum(recent) / len(recent)
+            sug = round(max(-20.0, min(20.0, config.WHEEL_BALANCE_PCT + delta)), 1)
+            bal = {"bias_rpm": None, "current": config.WHEEL_BALANCE_PCT, "suggested": sug}
+            res = {"mode": mode, "relay_rpm": d, "hyst_mm": h, "relay_s": 0, "cycles": 0,
+                   "kg": "—", "net_lead_s": "—", "lag_s": "—", "r2": "—",
+                   "current": {k: getattr(config, k) for k in keys[:3]},
+                   "suggestions": [], "balance": bal,
+                   "warnings": [f"The AGV ran off-centre at speed (one wheel faster). Set Wheel "
+                                f"balance to {sug:+.1f} % (now {bal['current']:+.1f} %), then run "
+                                "the auto-tune again to get the gains."]}
+            finish(phase, f"{message} — wheel balance {sug:+.1f} % suggested", res)
+        else:
+            finish(phase, message)
 
     def finish(phase, message, result=None):
         st["phase"] = phase; st["message"] = message; st["result"] = result
@@ -212,7 +251,7 @@ async def autotune_mode(state):
             return
         try:
             r = build_result(mode, d, h, ts, us, pvs, periods[2:] or periods, amps[2:] or amps,
-                             target_speed)
+                             target_speed, u_bias)
             finish("done", f"{reason} — model fitted (R² {r['r2']})", r)
         except Exception as ex:                      # never crash the mode on a bad fit
             finish("failed", f"Fit failed: {ex}")
@@ -225,7 +264,7 @@ async def autotune_mode(state):
                 if st["phase"] == "relay":
                     finish_with_fit("Time limit")
                 else:
-                    finish("failed", f"Time limit ({max_s:.0f} s) reached before the AGV ran straight at speed.")
+                    finish_warmup("failed", f"Time limit ({max_s:.0f} s) reached before the AGV ran straight at speed")
                 break
             if time.time() - state.can_last_rx > config.CAN_TIMEOUT:
                 finish("aborted", "Magnetic sensor (CAN) timeout"); break
@@ -249,7 +288,7 @@ async def autotune_mode(state):
                 if st["phase"] == "relay":
                     finish_with_fit(f"Error reached the {err_limit:.0f} mm limit")
                 else:
-                    finish("aborted", f"Error {e:+.0f} mm above the {err_limit:.0f} mm limit during warm-up")
+                    finish_warmup("aborted", f"Error {e:+.0f} mm above the {err_limit:.0f} mm limit during warm-up")
                 break
 
             _now = time.perf_counter()
@@ -261,6 +300,8 @@ async def autotune_mode(state):
 
             if st["phase"] == "warmup":
                 left, right, dbg = pid.compute(pv, base, error_sign)
+                if cmd_speed >= 0.5 * target_speed and base > 0:
+                    bal_samples.append(-200.0 * dbg["output"] / base)
                 out, dterm = dbg["output"], dbg["d"]
                 if cmd_speed >= target_speed and abs(e) < max(10.0, 3 * h):
                     straight_since = straight_since or now
@@ -307,6 +348,7 @@ async def autotune_mode(state):
                     finish_with_fit(f"{len(periods)} weaves / {now - relay_t0:.1f} s recorded")
                     break
 
+            left, right = motion.balance(left, right)
             left, right = motion.keep_steering(left, right)
             state.set_ao(0, motion.rpm_to_voltage(left, "left"))
             state.set_ao(1, motion.rpm_to_voltage(right, "right"))

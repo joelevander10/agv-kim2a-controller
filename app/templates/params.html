@@ -528,7 +528,9 @@ const TUNE_LAYOUT = [
   ['MANUAL SPEEDS', [
     ['MANUAL_TARGET_HIGH_SPEED', 'High (m/s)'],
     ['MANUAL_TARGET_SLOW_SPEED', 'Slow (m/s)'],
-    ['MANUAL_TRIM_PCT',          'Straight trim (%, + = left)'],
+  ]],
+  ['WHEEL BALANCE (MANUAL + AUTO)', [
+    ['WHEEL_BALANCE_PCT', 'Balance (%, + = steer left)'],
   ]],
   ['PID GAINS — MAX', [
     ['KP_MAX', 'KP'], ['TD_MAX', 'TD'], ['N_MAX', 'N'], ['V_RED_COEF_MAX', 'V-Red'],
@@ -697,8 +699,25 @@ function _atRender(r) {
          keys.map(k => '<td>' + s.values[k] + '</td>').join('') +
          '<td><button class="cal-btn start at-apply" data-i="' + i + '">APPLY</button></td></tr>';
   });
+  if (r.balance) {
+    h += '<tr><td>Wheel balance</td><td colspan="' + keys.length + '">steady steering ' + r.balance.bias_rpm +
+         ' rpm · now ' + r.balance.current + ' % → suggested ' + r.balance.suggested + ' %</td>' +
+         '<td><button class="cal-btn start at-apply-bal">APPLY</button></td></tr>';
+  }
   h += '</table>';
   _atRes.innerHTML = h;
+  const balBtn = _atRes.querySelector('.at-apply-bal');
+  if (balBtn) balBtn.addEventListener('click', () => {
+    const vals = { WHEEL_BALANCE_PCT: r.balance.suggested };
+    fetch('/api/params/tuning', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) })
+      .then(x => x.json().then(d => ({ ok: x.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok) { _atSet(d.error || 'Apply failed', 'warn'); return; }
+        _atSet('Wheel balance set to ' + vals.WHEEL_BALANCE_PCT + ' % and saved — run the auto-tune again for the gains.', 'ok');
+        if (typeof _tLoad === 'function') _tLoad();
+      })
+      .catch(() => _atSet('Connection error', 'warn'));
+  });
   _atRes.querySelectorAll('.at-apply').forEach(b => b.addEventListener('click', () => {
     const vals = r.suggestions[+b.dataset.i].values;
     fetch('/api/params/tuning', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(vals) })

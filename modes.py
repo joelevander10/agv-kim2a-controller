@@ -245,6 +245,10 @@ async def auto_mode(state, engine=None):
                 # Near top speed one wheel would need more than 5 V and get
                 # clipped, losing half the steering. Slow BOTH wheels by the
                 # excess instead so the left/right difference is kept (as Kayaba).
+                # Wheel balance first (a wheel that runs fast would otherwise
+                # need a constant steering output = a constant tape offset that
+                # grows with speed), then keep steering inside the 5 V limit.
+                left_rpm, right_rpm = motion.balance(left_rpm, right_rpm)
                 left_rpm, right_rpm = motion.keep_steering(left_rpm, right_rpm)
 
                 left_v  = motion.rpm_to_voltage(left_rpm,  "left")
@@ -372,12 +376,12 @@ async def manual_mode(state):
         # Re-issue on a speed change too, otherwise an edit made while a jog
         # button is held would not take effect until it is released and pressed
         # again.
-        # Straight trim (PARAMS > LIVE TUNING > MANUAL SPEEDS). Manual driving is
-        # open-loop, so if one wheel runs slightly faster the AGV curves. trim > 0
-        # slows the left wheel and speeds the right one (steers LEFT, fixes a drift
-        # to the right); trim < 0 does the opposite. Spins on the spot are not
-        # trimmed. tl / tr scale the left / right wheel.
-        trim = config.MANUAL_TRIM_PCT
+        # Wheel balance (PARAMS > LIVE TUNING > WHEEL BALANCE, also used in AUTO).
+        # Manual driving is open-loop, so if one wheel runs slightly faster the
+        # AGV curves. > 0 slows the left wheel and speeds the right one (fixes a
+        # drift to the right); < 0 the opposite. Spins on the spot are not
+        # balanced. tl / tr scale the left / right wheel.
+        trim = config.WHEEL_BALANCE_PCT
         tl, tr = 1.0 - trim / 200.0, 1.0 + trim / 200.0
         rpms = (rpm_high, rpm_slow, trim)
         if motion_state != current_motion or rpms != last_rpms:
