@@ -94,10 +94,16 @@ async def auto_mode(state, engine=None):
                 was_sequence_stopped = False
 
             # ── Target speed and PID gain selection ───────────────────────────
+            # Speed modes, slowest to fastest: APPROACH, SLOW, MEDIUM, HIGH, MAX.
+            # Anything else (e.g. a typo in a sequence) runs as HIGH.
             if state.speed_mode == "APPROACH":
                 target_speed = config.AUTO_TARGET_APPROACH_SPEED
             elif state.speed_mode == "SLOW":
                 target_speed = config.AUTO_TARGET_SLOW_SPEED
+            elif state.speed_mode == "MEDIUM":
+                target_speed = config.AUTO_TARGET_MEDIUM_SPEED
+            elif state.speed_mode == "MAX":
+                target_speed = config.AUTO_TARGET_MAX_SPEED
             else:
                 target_speed = config.AUTO_TARGET_HIGH_SPEED
 
@@ -109,6 +115,16 @@ async def auto_mode(state, engine=None):
                                      config.V_RED_COEF,
                                      clamp_hi=config.OUTPUT_CLAMP_RPM,
                                      clamp_lo=-config.OUTPUT_CLAMP_RPM)
+                elif state.speed_mode == "MEDIUM":
+                    pid.update_gains(config.KP_MEDIUM, config.TD_MEDIUM,
+                                     config.N_MEDIUM, config.V_RED_COEF_MEDIUM,
+                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
+                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
+                elif state.speed_mode == "MAX":
+                    pid.update_gains(config.KP_MAX, config.TD_MAX,
+                                     config.N_MAX, config.V_RED_COEF_MAX,
+                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
+                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
                 elif state.speed_mode == "APPROACH":
                     # Asymmetric clamp: barely steer into the one-sided guide bar
                     # (let it center the AGV mechanically), keep authority to steer
@@ -117,9 +133,15 @@ async def auto_mode(state, engine=None):
                                      config.N_APPROACH, config.V_RED_COEF_APPROACH,
                                      clamp_hi=config.OUTPUT_CLAMP_INTO_BAR_APPROACH,
                                      clamp_lo=-config.OUTPUT_CLAMP_AWAY_APPROACH)
-                else:
+                elif state.speed_mode == "SLOW":
                     pid.update_gains(config.KP_SLOW, config.TD_SLOW,
                                      config.N_SLOW, config.V_RED_COEF_SLOW,
+                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
+                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
+                else:
+                    # Unknown mode runs at HIGH speed (above) — use HIGH gains.
+                    pid.update_gains(config.KP, config.TD, config.N,
+                                     config.V_RED_COEF,
                                      clamp_hi=config.OUTPUT_CLAMP_RPM,
                                      clamp_lo=-config.OUTPUT_CLAMP_RPM)
                 last_speed_mode = state.speed_mode
@@ -289,7 +311,8 @@ async def auto_mode(state, engine=None):
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def manual_mode(state):
-    """Handles pendant jogging, web remote and USB keypad.
+    """Handles web remote, USB keypad and (if io_mapping.PENDANT_ENABLED) the
+    physical jog pendant.
     Web remote (state.web_manual_command) takes priority over physical DI buttons.
     While nothing is jogging the wheel brakes are ON (set_brake), not released.
     Emergency is fully owned by mode_manager — this task does not check it."""
@@ -319,10 +342,15 @@ async def manual_mode(state):
         if web_cmd is not None:
             motion_state = web_cmd
         elif di is not None:
-            pb_fwd   = di[config.DI_FWD]
-            pb_rvs   = di[config.DI_REV]
-            pb_left  = di[config.DI_LEFT]
-            pb_right = di[config.DI_RIGHT]
+            if config.PENDANT_ENABLED:
+                pb_fwd   = di[config.DI_FWD]
+                pb_rvs   = di[config.DI_REV]
+                pb_left  = di[config.DI_LEFT]
+                pb_right = di[config.DI_RIGHT]
+            else:
+                # No pendant fitted: DI4-DI7 are ignored, the AGV stays braked
+                # unless the keypad / web page is jogging.
+                pb_fwd = pb_rvs = pb_left = pb_right = False
 
             if pb_fwd and pb_left:       motion_state = "fwd_left"
             elif pb_fwd and pb_right:    motion_state = "fwd_right"

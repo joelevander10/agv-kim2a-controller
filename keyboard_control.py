@@ -21,8 +21,7 @@ PLC trolley controls (hold-to-run, MANUAL only, needs SLMP enabled)
     Opposite keys held together (Z+X, U+I, B+N) cancel each other.
     Brake / brake release stay on the TROLLEY page.
 Actions (one press)
-    1 APPROACH  2 SLOW  4 HIGH          (AUTO speed mode; ARMED/RUNNING)
-    3 / 5       MEDIUM / MAX            — not on this AGV
+    1 APPROACH  2 SLOW  3 MEDIUM  4 HIGH  5 MAX   (AUTO speed mode; ARMED/RUNNING)
     G START AUTO from ARMED (same as the START button; needs tape)
     Q switch MANUAL <-> AUTO (overrides the selector until it is moved)
     K / L select forward track LEFT / RIGHT by hand (ARMED/RUNNING).
@@ -43,7 +42,7 @@ import config
 logger = logging.getLogger(__name__)
 
 MOVE_KEYS = {"w", "a", "s", "d"}
-SPEED_KEYS = {"1": "APPROACH", "2": "SLOW", "4": "HIGH"}
+SPEED_KEYS = {"1": "APPROACH", "2": "SLOW", "3": "MEDIUM", "4": "HIGH", "5": "MAX"}
 TRACK_KEYS = {"k": "left", "l": "right"}
 ROTATE_KEYS = {"t": "left", "y": "right"}
 # PLC trolley manual bits (hold-to-run, MANUAL only) — see apply_plc().
@@ -65,8 +64,6 @@ PLC_KEY_NAMES = {
 PLC_OPPOSITES = (("z", "x"), ("u", "i"), ("b", "n"))
 # Kayaba keys with no matching hardware/feature on KIM2A.
 UNSUPPORTED_KEYS = {
-    "3": "speed MEDIUM is not available on this AGV (APPROACH/SLOW/HIGH only)",
-    "5": "speed MAX is not available on this AGV (APPROACH/SLOW/HIGH only)",
     "r": "this AGV has no AUTO REVERSE",
     "7": "cabang is selected on the HMI, not the keypad",
     "8": "cabang is selected on the HMI, not the keypad",

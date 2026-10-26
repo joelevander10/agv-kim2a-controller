@@ -27,6 +27,7 @@
     "DI_REV": 5,
     "DI_LEFT": 6,
     "DI_RIGHT": 7,
+    "PENDANT_ENABLED": false,
     "DI_MODE_SWITCH": 2,
     "DI_START": 0,
     "DI_RESET": 1
@@ -57,6 +58,8 @@
     "MANUAL_TARGET_SLOW_SPEED": 0.2,
     "AUTO_TARGET_HIGH_SPEED": 0.40,
     "AUTO_TARGET_SLOW_SPEED": 0.20,
+    "AUTO_TARGET_MEDIUM_SPEED": 0.5,
+    "AUTO_TARGET_MAX_SPEED": 1.0,
     "AUTO_TARGET_EXTRA_SLOW_SPEED": 0.15,
     "ACCEL_RATE": 0.8
   },
@@ -70,6 +73,9 @@
     "KP_SLOW": 2.2,
     "TD_SLOW": 0.14,
     "N_SLOW": 12,
+    "_comment_medium_max": "MEDIUM (0.5 m/s) and MAX (1.0 m/s) gains — start = copy of the HIGH gains; tune with PARAMS > PID AUTO-TUNE.",
+    "KP_MEDIUM": 1.4, "TD_MEDIUM": 0.12, "N_MEDIUM": 20,
+    "KP_MAX": 1.4, "TD_MAX": 0.12, "N_MAX": 20,
     "_comment_shared": "Shared — integral and timing constants",
     "TI": 20,
     "TI_DEADBAND": 25,
@@ -78,6 +84,8 @@
     "_comment_sr": "Speed reduction coefficients — split by speed mode",
     "V_RED_COEF": 4,
     "V_RED_COEF_SLOW": 2,
+    "V_RED_COEF_MEDIUM": 4,
+    "V_RED_COEF_MAX": 4,
     "OUTPUT_CLAMP_RPM": 800,
     "SR_ALPHA": 0.15,
     "SR_CAP": 0.55
@@ -335,7 +343,7 @@
     "SETTLE_S": 0.5
   },
   "keypad": {
-    "_comment": "Keypad USB (dongle) di PC AGV, mapping sama dengan AGV Kayaba. WASD/panah = gerak (tahan, hanya MANUAL), 1/2/4 = speed AUTO APPROACH/SLOW/HIGH (3 MEDIUM & 5 MAX tidak ada di AGV ini), Q = ganti MANUAL/AUTO, K/L = track kiri/kanan, E = EMERGENCY STOP (lepas dengan RESET), ENTER = RESET, G = START AUTO (hanya dari ARMED, harus ada tape). PLC trolley (tahan, hanya MANUAL, SLMP harus aktif): Z = pusher EXTEND, X = pusher RETRACT, U/I/O = conveyor atas FWD/RVS/CLR ERR, B/N/M = conveyor bawah FWD/RVS/CLR ERR. R (reverse) tidak ada di AGV ini. T = putar 180° kiri, Y = putar 180° kanan. cabang (7/8/9/0) tidak dipakai di keypad, pilih di HMI. NAME_CONTAINS kosong = semua keyboard USB dipakai; isi dengan sebagian nama keypad (lihat: python3 debugging/list_keypads.py) supaya hanya keypad itu yang dipakai. GRAB true = tombol tidak masuk ke desktop/terminal PC AGV.",
+    "_comment": "Keypad USB (dongle) di PC AGV, mapping sama dengan AGV Kayaba. WASD/panah = gerak (tahan, hanya MANUAL), 1-5 = speed AUTO APPROACH/SLOW/MEDIUM/HIGH/MAX, Q = ganti MANUAL/AUTO, K/L = track kiri/kanan, E = EMERGENCY STOP (lepas dengan RESET), ENTER = RESET, G = START AUTO (hanya dari ARMED, harus ada tape). PLC trolley (tahan, hanya MANUAL, SLMP harus aktif): Z = pusher EXTEND, X = pusher RETRACT, U/I/O = conveyor atas FWD/RVS/CLR ERR, B/N/M = conveyor bawah FWD/RVS/CLR ERR. R (reverse) tidak ada di AGV ini. T = putar 180° kiri, Y = putar 180° kanan. cabang (7/8/9/0) tidak dipakai di keypad, pilih di HMI. NAME_CONTAINS kosong = semua keyboard USB dipakai; isi dengan sebagian nama keypad (lihat: python3 debugging/list_keypads.py) supaya hanya keypad itu yang dipakai. GRAB true = tombol tidak masuk ke desktop/terminal PC AGV.",
     "ENABLED": true,
     "NAME_CONTAINS": "XING WEI",
     "EXCLUDE_NAME_CONTAINS": ["AT Translated Set 2"],

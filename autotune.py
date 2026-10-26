@@ -27,8 +27,8 @@ the web STOP; an error above err_limit ends the test (the data recorded up to
 then is still used if there is enough). RFID tags are not acted on (see
 rfid_processor.py). Gains are only applied when the engineer presses APPLY.
 
-Ported from the AGV Kayaba controller. KIM2A differences: speed modes HIGH,
-SLOW and APPROACH, no lidar, forward error sign fixed at -1 like auto_mode.
+Ported from the AGV Kayaba controller. KIM2A differences: speed modes MAX, HIGH,
+MEDIUM, SLOW and APPROACH, no lidar, forward error sign fixed at -1 like auto_mode.
 
 APPROACH: in normal AUTO the station approach runs against the one-sided guide
 bar with an asymmetric output clamp (+8 rpm into the bar). The test itself
@@ -50,6 +50,8 @@ logger = logging.getLogger(__name__)
 
 # speed mode → (target speed attr, gain keys KP/TD/N/V_RED)
 MODE_INFO = {
+    "MAX":    ("AUTO_TARGET_MAX_SPEED",    ("KP_MAX",  "TD_MAX",  "N_MAX",  "V_RED_COEF_MAX")),
+    "MEDIUM": ("AUTO_TARGET_MEDIUM_SPEED", ("KP_MEDIUM", "TD_MEDIUM", "N_MEDIUM", "V_RED_COEF_MEDIUM")),
     "HIGH":   ("AUTO_TARGET_HIGH_SPEED",   ("KP",      "TD",      "N",      "V_RED_COEF")),
     "SLOW":   ("AUTO_TARGET_SLOW_SPEED",   ("KP_SLOW", "TD_SLOW", "N_SLOW", "V_RED_COEF_SLOW")),
     # Run on straight tape WITHOUT the guide bar — see the module docstring.

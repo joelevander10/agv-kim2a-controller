@@ -63,6 +63,9 @@ DI_FWD         = _params["io_mapping"]["DI_FWD"]
 DI_REV         = _params["io_mapping"]["DI_REV"]
 DI_LEFT        = _params["io_mapping"]["DI_LEFT"]
 DI_RIGHT       = _params["io_mapping"]["DI_RIGHT"]
+# Physical jog pendant on DI_FWD/REV/LEFT/RIGHT. false = those inputs are
+# ignored in MANUAL (drive with the USB keypad or the web MANUAL page only).
+PENDANT_ENABLED = bool(_params["io_mapping"].get("PENDANT_ENABLED", True))
 DI_MODE_SWITCH = _params["io_mapping"]["DI_MODE_SWITCH"]
 DI_START       = _params["io_mapping"]["DI_START"]
 DI_RESET       = _params["io_mapping"]["DI_RESET"]
@@ -105,6 +108,8 @@ MANUAL_TARGET_SLOW_SPEED     = _params["speeds"]["MANUAL_TARGET_SLOW_SPEED"]
 AUTO_TARGET_HIGH_SPEED       = _params["speeds"]["AUTO_TARGET_HIGH_SPEED"]
 AUTO_TARGET_SLOW_SPEED       = _params["speeds"]["AUTO_TARGET_SLOW_SPEED"]
 AUTO_TARGET_APPROACH_SPEED   = _params["speeds"].get("AUTO_TARGET_APPROACH_SPEED", 0.1)
+AUTO_TARGET_MEDIUM_SPEED     = _params["speeds"].get("AUTO_TARGET_MEDIUM_SPEED", 0.5)
+AUTO_TARGET_MAX_SPEED        = _params["speeds"].get("AUTO_TARGET_MAX_SPEED", 1.0)
 ACCEL_RATE                   = _params["speeds"]["ACCEL_RATE"]
 DECEL_RATE                   = _params["speeds"]["DECEL_RATE"]
 APPROACH_DECEL_RATE          = _params["speeds"]["APPROACH_DECEL_RATE"]
@@ -122,6 +127,15 @@ KP_APPROACH         = _params["pid_tuning"].get("KP_APPROACH",         1.6)
 TD_APPROACH         = _params["pid_tuning"].get("TD_APPROACH",         0.12)
 N_APPROACH          = _params["pid_tuning"].get("N_APPROACH",          12)
 
+# MEDIUM / MAX gains — fall back to the HIGH set when a profile has none.
+KP_MEDIUM = _params["pid_tuning"].get("KP_MEDIUM", KP)
+TD_MEDIUM = _params["pid_tuning"].get("TD_MEDIUM", TD)
+N_MEDIUM  = _params["pid_tuning"].get("N_MEDIUM",  N)
+
+KP_MAX = _params["pid_tuning"].get("KP_MAX", KP)
+TD_MAX = _params["pid_tuning"].get("TD_MAX", TD)
+N_MAX  = _params["pid_tuning"].get("N_MAX",  N)
+
 TI          = _params["pid_tuning"]["TI"]
 TI_DEADBAND = _params["pid_tuning"]["TI_DEADBAND"]
 TI_MAX      = _params["pid_tuning"]["TI_MAX"]
@@ -130,6 +144,8 @@ DT          = _params["pid_tuning"]["DT"]
 V_RED_COEF            = _params["pid_tuning"]["V_RED_COEF"]
 V_RED_COEF_SLOW       = _params["pid_tuning"]["V_RED_COEF_SLOW"]
 V_RED_COEF_APPROACH   = _params["pid_tuning"].get("V_RED_COEF_APPROACH", 0)
+V_RED_COEF_MEDIUM     = _params["pid_tuning"].get("V_RED_COEF_MEDIUM", V_RED_COEF)
+V_RED_COEF_MAX        = _params["pid_tuning"].get("V_RED_COEF_MAX", V_RED_COEF)
 OUTPUT_CLAMP_RPM = _params["pid_tuning"]["OUTPUT_CLAMP_RPM"]
 # Asymmetric APPROACH clamp (magnitudes, rpm). The station approach is guided by a
 # one-sided physical bar on the AGV's right, so steering INTO the bar is held tight
@@ -304,6 +320,8 @@ def _validate():
         ("AUTO_TARGET_HIGH_SPEED",   AUTO_TARGET_HIGH_SPEED),
         ("AUTO_TARGET_SLOW_SPEED",   AUTO_TARGET_SLOW_SPEED),
         ("AUTO_TARGET_APPROACH_SPEED",   AUTO_TARGET_APPROACH_SPEED),
+        ("AUTO_TARGET_MEDIUM_SPEED", AUTO_TARGET_MEDIUM_SPEED),
+        ("AUTO_TARGET_MAX_SPEED",    AUTO_TARGET_MAX_SPEED),
     ]:
         check(0 <= val <= _MAX_SPEED_MPS,
               f"{name} must be in [0, {_MAX_SPEED_MPS}] m/s (got {val})")
@@ -371,6 +389,8 @@ TUNABLE_SPECS = {   # key: (min, max)
     "AUTO_TARGET_HIGH_SPEED":         (0.0,   _MAX_SPEED_MPS),
     "AUTO_TARGET_SLOW_SPEED":         (0.0,   _MAX_SPEED_MPS),
     "AUTO_TARGET_APPROACH_SPEED":     (0.0,   _MAX_SPEED_MPS),
+    "AUTO_TARGET_MEDIUM_SPEED":       (0.0,   _MAX_SPEED_MPS),
+    "AUTO_TARGET_MAX_SPEED":          (0.0,   _MAX_SPEED_MPS),
     "ACCEL_RATE":                     (0.01,  10.0),
     "DECEL_RATE":                     (0.01,  10.0),
     "APPROACH_DECEL_RATE":            (0.01,  10.0),
@@ -383,6 +403,16 @@ TUNABLE_SPECS = {   # key: (min, max)
     "TD":                             (0.0,   5.0),
     "N":                              (1.0,   100.0),
     "V_RED_COEF":                     (0.0,   50.0),
+    # PID gains — MEDIUM
+    "KP_MEDIUM":                      (0.0,   50.0),
+    "TD_MEDIUM":                      (0.0,   5.0),
+    "N_MEDIUM":                       (1.0,   100.0),
+    "V_RED_COEF_MEDIUM":              (0.0,   50.0),
+    # PID gains — MAX
+    "KP_MAX":                         (0.0,   50.0),
+    "TD_MAX":                         (0.0,   5.0),
+    "N_MAX":                          (1.0,   100.0),
+    "V_RED_COEF_MAX":                 (0.0,   50.0),
     # PID gains — SLOW
     "KP_SLOW":                        (0.0,   50.0),
     "TD_SLOW":                        (0.0,   5.0),
