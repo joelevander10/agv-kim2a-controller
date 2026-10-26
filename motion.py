@@ -27,6 +27,15 @@ def max_rpm(side="left"):
     """Highest motor rpm one wheel can be commanded (5 V on its speed AO)."""
     return voltage_to_rpm(5.0, side)
 
+def steer_limit(base_rpm):
+    """Largest steering difference (rpm per wheel) allowed at this speed:
+    STEER_LIMIT_PCT % of the base speed, never below STEER_LIMIT_MIN_RPM.
+    At 60 % the outer wheel runs at most 1.6x and the inner at least 0.4x
+    the set speed. 0 switches the limit off (only the rpm clamp applies)."""
+    if config.STEER_LIMIT_PCT <= 0:
+        return None
+    return max(config.STEER_LIMIT_MIN_RPM, config.STEER_LIMIT_PCT / 100.0 * max(0.0, base_rpm))
+
 def keep_steering(left_rpm, right_rpm):
     """If either wheel is asked for more than it can do (5 V), slow BOTH
     wheels by the excess so the left/right difference — the steering — is

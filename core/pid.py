@@ -65,7 +65,7 @@ class PIDController:
 
     # ── Compute ───────────────────────────────────────────────────────────────
 
-    def compute(self, pv, base_rpm, error_sign=-1.0, feedforward=0.0):
+    def compute(self, pv, base_rpm, error_sign=-1.0, feedforward=0.0, steer_limit=None):
         """One PID cycle.
 
         Args:
@@ -81,6 +81,10 @@ class PIDController:
                          subject to the PID output clamp (it is a known-good
                          command); the final wheel voltages are still clamped
                          downstream.
+            steer_limit: optional cap (rpm) on the TOTAL steering difference
+                         (PID + feedforward), usually a fraction of base_rpm, so
+                         at low speed the outer wheel can never surge to several
+                         times the set speed (see motion.steer_limit).
 
         Returns:
             (left_rpm, right_rpm, debug_dict)
@@ -129,6 +133,8 @@ class PIDController:
 
         # ── Total steering differential = PID + curvature feedforward ─────────
         output_total = output + feedforward
+        if steer_limit is not None:
+            output_total = max(-steer_limit, min(steer_limit, output_total))
 
         # ── Speed reduction (low-pass filtered, capped) ───────────────────────
         raw_sr               = abs(e * self._v_red_coef) + abs(de) * 0.5

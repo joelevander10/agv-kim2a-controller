@@ -27,6 +27,13 @@ the web STOP; an error above err_limit ends the test (the data recorded up to
 then is still used if there is enough). RFID tags are not acted on (see
 rfid_processor.py). Gains are only applied when the engineer presses APPLY.
 
+Branches: the MGS1600 reports two tracks (left_mm / right_mm). On a single
+tape they are the same; at a fork or merge they move apart. The relay test
+must not weave across a split (it would steer onto the branch and wreck the
+fit), so when the two tracks are more than FORK_GAP_MM apart the test stops
+and brakes: in the relay phase the data recorded BEFORE the split started is
+still fitted; in warm-up it aborts with a message to start further away.
+
 Ported from the AGV Kayaba controller. KIM2A differences: speed modes MAX, HIGH,
 MEDIUM, SLOW and APPROACH, no lidar, forward error sign fixed at -1 like auto_mode.
 
@@ -65,6 +72,17 @@ DEFAULTS = {"relay_rpm": 20.0, "hyst_mm": 1.5, "err_limit_mm": 50.0,
 MIN_RELAY_S = 3.0          # least relay data the fit needs
 LEAD_S = 0.3               # relay switches on e + LEAD_S·de/dt (adds weaves → better fit)
 RELAY_S = 10.0             # relay test length when the cycle count is not reached first
+# Sensor-noise budget for the proposed N: KP·N is how many rpm a 1 mm jump of
+# the reading (MGS1600 reports whole mm) moves each wheel at once. At slow speed
+# the fit asks for a big KP, and the usual N would turn 1 mm of noise into a
+# wheel-speed jump of most of the set speed (the AGV surges fast/slow, worst at
+# branches where the reading is noisiest). N is capped so 1 mm moves each wheel
+# by at most NOISE_BUDGET of the base speed; HIGH / MAX are not affected.
+NOISE_BUDGET = 0.10
+N_MIN = 2.0
+FORK_GAP_MM = 15.0         # left/right track this far apart = branch / fork → stop the test
+FORK_START_MM = 5.0        # the split starts here — relay data from then on is dropped
+FORK_FRAMES = 2            # frames in a row above FORK_GAP_MM (ignores a single glitch)
 
 # (id, label, damping ζ, ωn = factor / T)
 DESIGNS = [
@@ -118,13 +136,17 @@ def design(mode, fit, speed):
     tau_net = fit["tau_l"] - fit["lag"]
     tau_geom = config.SENSOR_LOOKAHEAD_M / max(speed, 0.05)
     t_lag = max(0.05, tau_geom - tau_net)
+    base = motion.mps_to_rpm(speed)
     out = []
     for did, label, zeta, f in DESIGNS:
         wn = min(3.0, max(0.5, f / t_lag))
         kp = wn * wn / kg
         td = max(0.0, 2.0 * zeta / wn - tau_net)
         n = min(30.0, max(5.0, td / 0.04)) if td > 0 else getattr(config, keys[2])
-        out.append({"id": did, "label": label,
+        n_cap = NOISE_BUDGET * base / kp if kp > 0 else n
+        capped = n > n_cap
+        n = max(N_MIN, min(n, n_cap))
+        out.append({"id": did, "label": label, "n_capped": capped,
                     "zeta": zeta, "wn": round(wn, 2),
                     "values": {keys[0]: round(kp, 3), keys[1]: round(td, 3), keys[2]: round(n, 1)}})
     return out
@@ -169,6 +191,10 @@ def build_result(mode, d, h, ts, us, pvs, periods, amps, speed, u_bias=0.0):
            "suggestions": design(mode, fit, speed) if fit["kg"] > 0 else [],
            "balance": balance_suggestion(u_bias, motion.mps_to_rpm(speed)),
            "warnings": warn}
+    if any(s.get("n_capped") for s in res["suggestions"]):
+        warn.append(f"N was lowered (noise limit): at {speed:.2f} m/s the large KP would make "
+                    "the wheels jump fast/slow on every 1 mm of sensor noise, worst at branches. "
+                    f"Each 1 mm now moves a wheel by at most {NOISE_BUDGET * 100:.0f} % of the speed.")
     bal = res["balance"]
     if bal and abs(bal["suggested"] - bal["current"]) >= 0.5:
         warn.append(f"The AGV needed a steady {bal['bias_rpm']:+.0f} rpm of steering just to run "
@@ -213,6 +239,7 @@ async def autotune_mode(state):
     cyc_max, cyc_min = -1e9, 1e9
     periods, amps = [], []
     ts, us, pvs = [], [], []
+    fork_frames, split_t = 0, None
 
     def finish_warmup(phase, message):
         """Warm-up never got straight (usually a big steady offset from a wheel
@@ -238,21 +265,22 @@ async def autotune_mode(state):
         st["phase"] = phase; st["message"] = message; st["result"] = result
         logger.warning("[AUTOTUNE] %s — %s", phase.upper(), message)
 
-    def finish_with_fit(reason):
+    def finish_with_fit(reason, ok_note=""):
         if relay_t0 is not None and switches < 3:
             finish("failed", f"{reason} — the relay never steered the AGV back to the tape "
                              f"(±{d:.0f} rpm is too weak against the side-pull at this speed, "
                              "or the tape is not straight). Increase Relay (rpm), e.g. "
                              f"{min(400, int(d * 2.5))}, and use a straight section.")
             return
-        if relay_t0 is None or ts[-1] - ts[0] < MIN_RELAY_S:
+        if relay_t0 is None or len(ts) < 2 or ts[-1] - ts[0] < MIN_RELAY_S:
             finish("failed", f"{reason} — not enough relay data (needs {MIN_RELAY_S:.0f} s). "
-                             "Use a longer straight tape, a smaller relay or a longer time limit.")
+                             "Use a longer straight tape (start further from any branch), "
+                             "a smaller relay or a longer time limit.")
             return
         try:
             r = build_result(mode, d, h, ts, us, pvs, periods[2:] or periods, amps[2:] or amps,
                              target_speed, u_bias)
-            finish("done", f"{reason} — model fitted (R² {r['r2']})", r)
+            finish("done", f"{reason} — model fitted{ok_note} (R² {r['r2']})", r)
         except Exception as ex:                      # never crash the mode on a bad fit
             finish("failed", f"Fit failed: {ex}")
 
@@ -277,6 +305,32 @@ async def autotune_mode(state):
             if not sensor["tape_detected"]:
                 finish("aborted", "Tape lost"); break
 
+            # Branch / fork: the two tracks move apart → stop before weaving onto it.
+            lm, rm = sensor.get("left_mm"), sensor.get("right_mm")
+            gap = abs(lm - rm) if lm is not None and rm is not None else 0.0
+            if gap > FORK_START_MM:
+                split_t = split_t or now
+            else:
+                split_t = None
+            fork_frames = fork_frames + 1 if gap > FORK_GAP_MM else 0
+            if fork_frames >= FORK_FRAMES:
+                why = f"Branch / fork reached (tracks {gap:.0f} mm apart)"
+                if st["phase"] == "relay":
+                    cut = (split_t or now) - 0.2          # drop the samples on the split
+                    keep = sum(1 for t in ts if t < cut)
+                    del ts[keep:], us[keep:], pvs[keep:]
+                    if switches < 3 or len(ts) < 2 or ts[-1] - ts[0] < MIN_RELAY_S:
+                        finish("failed", f"{why} — not enough relay data before the branch "
+                                         f"(needs {MIN_RELAY_S:.0f} s). Start the test further "
+                                         "from the branch, on single straight tape.")
+                    else:
+                        finish_with_fit(why, " from the data before the branch")
+                else:
+                    finish_warmup("aborted", why + " during warm-up — start the test further "
+                                  "from the branch (needs about speed × time limit metres of "
+                                  "single straight tape)")
+                break
+
             pv = sensor["right_mm"] if state.track_follow == "right" else sensor["left_mm"]
             if pv is None or abs(pv) > config.SENSOR_MAX_MM:
                 await asyncio.sleep(config.DT); continue
@@ -299,7 +353,8 @@ async def autotune_mode(state):
             base = motion.mps_to_rpm(cmd_speed)
 
             if st["phase"] == "warmup":
-                left, right, dbg = pid.compute(pv, base, error_sign)
+                left, right, dbg = pid.compute(pv, base, error_sign,
+                                               steer_limit=motion.steer_limit(base))
                 if cmd_speed >= 0.5 * target_speed and base > 0:
                     bal_samples.append(-200.0 * dbg["output"] / base)
                 out, dterm = dbg["output"], dbg["d"]

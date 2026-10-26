@@ -158,6 +158,13 @@ OUTPUT_CLAMP_RPM = _params["pid_tuning"]["OUTPUT_CLAMP_RPM"]
 # more authority. Default to the symmetric clamp so older profiles are unchanged.
 OUTPUT_CLAMP_INTO_BAR_APPROACH = _params["pid_tuning"].get("OUTPUT_CLAMP_INTO_BAR_APPROACH", OUTPUT_CLAMP_RPM)
 OUTPUT_CLAMP_AWAY_APPROACH     = _params["pid_tuning"].get("OUTPUT_CLAMP_AWAY_APPROACH",     OUTPUT_CLAMP_RPM)
+# Steering limit relative to speed: the PID + feedforward steering difference
+# is capped at STEER_LIMIT_PCT % of the current base speed (min
+# STEER_LIMIT_MIN_RPM). Matters only at slow speeds, where the rpm clamp above is
+# several times the base speed: high SLOW gains could otherwise make the outer
+# wheel surge to 3x SLOW on a sensor jump at a branch. 0 = off.
+STEER_LIMIT_PCT     = _params["pid_tuning"].get("STEER_LIMIT_PCT", 60.0)
+STEER_LIMIT_MIN_RPM = _params["pid_tuning"].get("STEER_LIMIT_MIN_RPM", 40.0)
 SR_ALPHA         = _params["pid_tuning"]["SR_ALPHA"]
 SR_CAP           = _params["pid_tuning"]["SR_CAP"]
 
@@ -433,6 +440,7 @@ TUNABLE_SPECS = {   # key: (min, max)
     "OUTPUT_CLAMP_RPM":               (1.0,   5000.0),
     "OUTPUT_CLAMP_INTO_BAR_APPROACH": (1.0,   5000.0),
     "OUTPUT_CLAMP_AWAY_APPROACH":     (1.0,   5000.0),
+    "STEER_LIMIT_PCT":                (0.0,   200.0),
     # Curvature feedforward
     "FF_SCALE":                       (0.0,   5.0),
     "FF_ALPHA":                       (0.001, 1.0),
