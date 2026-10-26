@@ -448,9 +448,26 @@ TUNABLE_DEFAULTS = {k: globals()[k] for k in TUNABLE_SPECS}
 TUNING_SAVE_FILE = os.environ.get(
     "AGV_TUNING_FILE", os.path.join(_dir, "data", f"tuning_{AGV_ID}.json"))
 TUNING_SAVED = {}
+# 2026-10-26 motor-map fix: the old map made the AGV drive at HALF the commanded
+# speed, so values saved before it (no "map_version": 2) are converted once on
+# load so the AGV behaves the same: speeds/ramps x0.5 (HIGH 1.6 -> 0.8, MAX 2.0
+# -> 1.0), rpm-based gains x0.5 (KP*, V_RED_COEF*, clamps). TD, N, FF and trim
+# are unchanged. The next APPLY on the PARAMS page rewrites the file as v2.
+TUNING_MAP_VERSION = 2
+_HALVE_ON_REMAP = {
+    "AUTO_TARGET_HIGH_SPEED", "AUTO_TARGET_SLOW_SPEED", "AUTO_TARGET_APPROACH_SPEED",
+    "AUTO_TARGET_MEDIUM_SPEED", "AUTO_TARGET_MAX_SPEED",
+    "MANUAL_TARGET_HIGH_SPEED", "MANUAL_TARGET_SLOW_SPEED",
+    "ACCEL_RATE", "DECEL_RATE", "APPROACH_DECEL_RATE",
+    "KP", "KP_SLOW", "KP_APPROACH", "KP_MEDIUM", "KP_MAX",
+    "V_RED_COEF", "V_RED_COEF_SLOW", "V_RED_COEF_APPROACH", "V_RED_COEF_MEDIUM", "V_RED_COEF_MAX",
+    "OUTPUT_CLAMP_RPM", "OUTPUT_CLAMP_INTO_BAR_APPROACH", "OUTPUT_CLAMP_AWAY_APPROACH",
+}
+TUNING_REMAPPED = False
 try:
     with open(TUNING_SAVE_FILE, "r") as _f:
         _saved = json.load(_f)
+    _old_map = isinstance(_saved, dict) and _saved.get("map_version", 1) < TUNING_MAP_VERSION
     for _k, _v in (_saved.get("values", {}) if isinstance(_saved, dict) else {}).items():
         if _k in TUNABLE_SPECS:
             _lo, _hi = TUNABLE_SPECS[_k]
@@ -458,9 +475,15 @@ try:
                 _v = float(_v)
             except (TypeError, ValueError):
                 continue
+            if _old_map and _k in _HALVE_ON_REMAP:
+                _v = round(_v * 0.5, 6)
+                TUNING_REMAPPED = True
             if _lo <= _v <= _hi:
                 globals()[_k] = _v
                 TUNING_SAVED[_k] = _v
+    if TUNING_REMAPPED:
+        print("Saved tuning was from the old motor map - speeds and rpm gains halved "
+              "(same real behaviour). APPLY on the PARAMS page saves them in the new scale.")
     if TUNING_SAVED:
         print(f"Saved tuning loaded from {TUNING_SAVE_FILE}: "
               + ", ".join(f"{k}={v}" for k, v in sorted(TUNING_SAVED.items())))

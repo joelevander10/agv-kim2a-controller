@@ -242,6 +242,10 @@ async def auto_mode(state, engine=None):
                 # ── PID compute ───────────────────────────────────────────────
                 left_rpm, right_rpm, dbg = pid.compute(pv, base_rpm, error_sign,
                                                        feedforward=ff_filtered)
+                # Near top speed one wheel would need more than 5 V and get
+                # clipped, losing half the steering. Slow BOTH wheels by the
+                # excess instead so the left/right difference is kept (as Kayaba).
+                left_rpm, right_rpm = motion.keep_steering(left_rpm, right_rpm)
 
                 left_v  = motion.rpm_to_voltage(left_rpm,  "left")
                 right_v = motion.rpm_to_voltage(right_rpm, "right")

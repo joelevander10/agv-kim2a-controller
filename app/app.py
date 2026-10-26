@@ -572,6 +572,7 @@ def _save_tuning(config):
             tmp = path + ".tmp"
             with open(tmp, "w") as f:
                 json.dump({"saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                           "map_version": config.TUNING_MAP_VERSION,
                            "values": values}, f, indent=2, sort_keys=True)
             os.replace(tmp, path)
         config.TUNING_SAVED = values
