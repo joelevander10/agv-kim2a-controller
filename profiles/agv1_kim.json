@@ -67,9 +67,13 @@
     "AUTO_TARGET_APPROACH_SPEED": 0.09,
     "AUTO_TARGET_MEDIUM_SPEED": 0.5,
     "AUTO_TARGET_MAX_SPEED": 1.0,
-    "ACCEL_RATE": 0.25,
-    "DECEL_RATE": 1.5,
-    "APPROACH_DECEL_RATE": 0.2
+    "_comment_ramps": "AUTO ramps in real m/s² (2026-10-27 fix: before, each ~10 Hz sensor frame stepped as if 10 ms had passed, so every ramp ran 10x slower than set; values divided by 10 = same behaviour). ACCEL_RATE is used toward SLOW / APPROACH; ACCEL_RATE_MEDIUM / _HIGH / _MAX toward those modes.",
+    "ACCEL_RATE": 0.025,
+    "ACCEL_RATE_MEDIUM": 0.025,
+    "ACCEL_RATE_HIGH": 0.025,
+    "ACCEL_RATE_MAX": 0.025,
+    "DECEL_RATE": 0.15,
+    "APPROACH_DECEL_RATE": 0.02
   },
 
   "pid_tuning": {

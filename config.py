@@ -118,6 +118,17 @@ AUTO_TARGET_MAX_SPEED        = _params["speeds"].get("AUTO_TARGET_MAX_SPEED", 1.
 ACCEL_RATE                   = _params["speeds"]["ACCEL_RATE"]
 DECEL_RATE                   = _params["speeds"]["DECEL_RATE"]
 APPROACH_DECEL_RATE          = _params["speeds"]["APPROACH_DECEL_RATE"]
+# Split acceleration: speeding up toward MEDIUM / HIGH / MAX uses its own rate
+# (m/s²); missing → ACCEL_RATE. SLOW and APPROACH use ACCEL_RATE.
+ACCEL_RATE_MEDIUM            = _params["speeds"].get("ACCEL_RATE_MEDIUM", ACCEL_RATE)
+ACCEL_RATE_HIGH              = _params["speeds"].get("ACCEL_RATE_HIGH", ACCEL_RATE)
+ACCEL_RATE_MAX               = _params["speeds"].get("ACCEL_RATE_MAX", ACCEL_RATE)
+
+
+def accel_rate(speed_mode):
+    """AUTO acceleration (m/s²) when speeding up toward this speed mode."""
+    return {"MEDIUM": ACCEL_RATE_MEDIUM, "HIGH": ACCEL_RATE_HIGH,
+            "MAX": ACCEL_RATE_MAX}.get(speed_mode, ACCEL_RATE)
 
 # ── PID Tuning ────────────────────────────────────────────────────────────────
 KP = _params["pid_tuning"]["KP"]
@@ -418,9 +429,12 @@ TUNABLE_SPECS = {   # key: (min, max)
     "AUTO_TARGET_APPROACH_SPEED":     (0.0,   _MAX_SPEED_MPS),
     "AUTO_TARGET_MEDIUM_SPEED":       (0.0,   _MAX_SPEED_MPS),
     "AUTO_TARGET_MAX_SPEED":          (0.0,   _MAX_SPEED_MPS),
-    "ACCEL_RATE":                     (0.01,  10.0),
-    "DECEL_RATE":                     (0.01,  10.0),
-    "APPROACH_DECEL_RATE":            (0.01,  10.0),
+    "ACCEL_RATE":                     (0.002, 10.0),
+    "ACCEL_RATE_MEDIUM":              (0.002, 10.0),
+    "ACCEL_RATE_HIGH":                (0.002, 10.0),
+    "ACCEL_RATE_MAX":                 (0.002, 10.0),
+    "DECEL_RATE":                     (0.002, 10.0),
+    "APPROACH_DECEL_RATE":            (0.002, 10.0),
     # Manual speeds
     "MANUAL_TARGET_HIGH_SPEED":       (0.0,   _MAX_SPEED_MPS),
     "MANUAL_TARGET_SLOW_SPEED":       (0.0,   _MAX_SPEED_MPS),
@@ -478,7 +492,12 @@ TUNING_SAVED = {}
 # load so the AGV behaves the same: speeds/ramps x0.5 (HIGH 1.6 -> 0.8, MAX 2.0
 # -> 1.0), rpm-based gains x0.5 (KP*, V_RED_COEF*, clamps). TD, N, FF and trim
 # are unchanged. The next APPLY on the PARAMS page rewrites the file as v2.
-TUNING_MAP_VERSION = 2
+# 2026-10-27 ramp fix (v3): AUTO ramps now use the real time between sensor
+# frames (~10 Hz) instead of 10 ms per frame, so every ramp would run 10x
+# faster than before. Older saved ramp rates are x0.1 on load so the AGV
+# accelerates / brakes exactly as it did.
+TUNING_MAP_VERSION = 3
+_TENTH_ON_RAMPFIX = {"ACCEL_RATE", "DECEL_RATE", "APPROACH_DECEL_RATE"}
 _HALVE_ON_REMAP = {
     "AUTO_TARGET_HIGH_SPEED", "AUTO_TARGET_SLOW_SPEED", "AUTO_TARGET_APPROACH_SPEED",
     "AUTO_TARGET_MEDIUM_SPEED", "AUTO_TARGET_MAX_SPEED",
@@ -492,7 +511,8 @@ TUNING_REMAPPED = False
 try:
     with open(TUNING_SAVE_FILE, "r") as _f:
         _saved = json.load(_f)
-    _old_map = isinstance(_saved, dict) and _saved.get("map_version", 1) < TUNING_MAP_VERSION
+    _old_map = isinstance(_saved, dict) and _saved.get("map_version", 1) < 2
+    _old_ramp = isinstance(_saved, dict) and _saved.get("map_version", 1) < 3
     for _k, _v in (_saved.get("values", {}) if isinstance(_saved, dict) else {}).items():
         if _k == "MANUAL_TRIM_PCT":          # renamed 2026-10-26
             _k = "WHEEL_BALANCE_PCT"
@@ -505,12 +525,22 @@ try:
             if _old_map and _k in _HALVE_ON_REMAP:
                 _v = round(_v * 0.5, 6)
                 TUNING_REMAPPED = True
+            if _old_ramp and _k in _TENTH_ON_RAMPFIX:
+                _v = round(_v * 0.1, 6)
+                TUNING_REMAPPED = True
             if _lo <= _v <= _hi:
                 globals()[_k] = _v
                 TUNING_SAVED[_k] = _v
+    # An old file's ACCEL_RATE was the one rate for every mode: the new split
+    # rates start from it (converted) unless the file has its own.
+    if _old_ramp and "ACCEL_RATE" in TUNING_SAVED:
+        for _k in ("ACCEL_RATE_MEDIUM", "ACCEL_RATE_HIGH", "ACCEL_RATE_MAX"):
+            if _k not in TUNING_SAVED:
+                globals()[_k] = ACCEL_RATE
+                TUNING_SAVED[_k] = ACCEL_RATE
     if TUNING_REMAPPED:
-        print("Saved tuning was from the old motor map - speeds and rpm gains halved "
-              "(same real behaviour). APPLY on the PARAMS page saves them in the new scale.")
+        print("Saved tuning was from an older scale (motor map / ramp timing) - converted "
+              "so the AGV behaves the same. APPLY on the PARAMS page saves the new scale.")
     if TUNING_SAVED:
         print(f"Saved tuning loaded from {TUNING_SAVE_FILE}: "
               + ", ".join(f"{k}={v}" for k, v in sorted(TUNING_SAVED.items())))

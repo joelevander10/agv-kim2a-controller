@@ -322,7 +322,9 @@ async def autotune_mode(state):
             _rdt = config.DT if ramp_t is None else min(max(_now - ramp_t, 0.0), 0.2)
             ramp_t = _now
             if cmd_speed < target_speed:          # real-time ramp (frames arrive ~10 Hz)
-                cmd_speed = min(target_speed, cmd_speed + config.ACCEL_RATE * _rdt)
+                # the mode's AUTO acceleration, but at least 0.2 m/s² so the
+                # warm-up does not use up the straight
+                cmd_speed = min(target_speed, cmd_speed + max(0.2, config.accel_rate(mode)) * _rdt)
             base = motion.mps_to_rpm(cmd_speed)
 
             if st["phase"] == "warmup":

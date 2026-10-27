@@ -253,8 +253,15 @@ async def auto_mode(state, engine=None):
                         await engine.on_marker("right")
 
                 # ── Acceleration / deceleration ramp ──────────────────────────
+                # Real time between sensor frames (~10 Hz), so the rates are true
+                # m/s². (Before 2026-10-27 each frame stepped as if 10 ms had
+                # passed: every ramp ran ~10x slower than set; saved values are
+                # converted in config.py so the AGV behaves the same.)
+                # Speeding up uses the TARGET mode's rate: ACCEL_RATE_MEDIUM /
+                # _HIGH / _MAX, else ACCEL_RATE (SLOW, APPROACH).
+                _rdt = _fdt if _fdt > 0 else config.DT
                 if current_target_speed < target_speed:
-                    current_target_speed += config.ACCEL_RATE * config.DT
+                    current_target_speed += config.accel_rate(state.speed_mode) * _rdt
                     if current_target_speed > target_speed:
                         current_target_speed = target_speed
                 elif current_target_speed > target_speed:
@@ -264,7 +271,7 @@ async def auto_mode(state, engine=None):
                     decel_rate = (config.APPROACH_DECEL_RATE
                                   if state.speed_mode == "APPROACH"
                                   else config.DECEL_RATE)
-                    current_target_speed -= decel_rate * config.DT
+                    current_target_speed -= decel_rate * _rdt
                     if current_target_speed < target_speed:
                         current_target_speed = target_speed
 
