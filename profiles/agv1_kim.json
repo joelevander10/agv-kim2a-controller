@@ -151,10 +151,11 @@
   },
 
   "feedforward": {
+    "_comment_2026_10_27": "Run logs: the route's curves are about 3.5 m radius (was 1.5 m for the old stadium) and there are LEFT and RIGHT curves. A set_speed SLOW action can say \"corner\": \"left\" / \"right\" (and \"radius_m\"); true uses CURVE_DIRECTION / CURVE_RADIUS_M below; false = no feedforward.",
     "_comment": "Curvature feedforward for corners: output_ff = FF_SCALE*sign*0.5*base_rpm*(TRACK_WIDTH_M/CURVE_RADIUS_M), applied while speed_mode is a curve mode. Stadium is CCW => all left turns. FF_SCALE=0.5 halves the compensation (2026-05-30).",
     "ENABLED": 1,
     "TRACK_WIDTH_M": 0.46,
-    "CURVE_RADIUS_M": 1.5,
+    "CURVE_RADIUS_M": 3.5,
     "CURVE_DIRECTION": "left",
     "CURVE_SPEED_MODES": ["SLOW"],
     "FF_ALPHA": 0.15,
@@ -164,12 +165,12 @@
 
   "sequences": [
     {
-      "_comment": "Slow down zone — RFID-only trigger",
+      "_comment": "Slow down zone — RFID-only trigger. Tag 0014 is used before BOTH left and right curves (run logs 2026-10-27), so no curve feedforward here (\"corner\": false) — the PID steers the curve. For feedforward, give right-curve tags their own ID with \"corner\": \"right\" and left-curve tags \"corner\": \"left\".",
       "name": "speed_zone_slow",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "0014" },
       "actions": [
-        { "type": "set_speed", "speed": "SLOW" }
+        { "type": "set_speed", "speed": "SLOW", "corner": false }
       ],
       "cooldown_s": 0.0,
       "requires_mode": "running"

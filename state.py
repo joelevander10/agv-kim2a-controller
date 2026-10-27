@@ -65,6 +65,9 @@ class KinematicState:
         # Web ERRORS page "SAVE CURRENT RUN": auto_mode saves the run
         # recording so far (CSV + PNG) and starts a new one.
         self.runlog_save_request = False
+        # Curve of the current corner zone (set_speed "corner"): {"sign": -1
+        # left / +1 right, "radius": m}; None = profile defaults.
+        self.curve = None
 
 
 class PerceptionState:
@@ -320,6 +323,11 @@ class AMRState:
     def sensor_hold_request(self): return self.kinematic.sensor_hold_request
     @sensor_hold_request.setter
     def sensor_hold_request(self, v): self.kinematic.sensor_hold_request = v
+
+    @property
+    def curve(self): return self.kinematic.curve
+    @curve.setter
+    def curve(self, v): self.kinematic.curve = v
 
     @property
     def runlog_save_request(self): return self.kinematic.runlog_save_request

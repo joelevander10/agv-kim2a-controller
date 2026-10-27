@@ -306,11 +306,17 @@ async def auto_mode(state, engine=None):
                 # Supply the geometric turn so the PID doesn't need a standing
                 # error to hold the curve. Low-pass filtered to smooth the
                 # step at corner entry/exit. ff = sign*0.5*base*(W/R).
+                # Direction and radius come from the corner tag (state.curve,
+                # set_speed "corner": "left"/"right", "radius_m"), else the
+                # profile. Only in the curve speed modes (SLOW): a keypad /
+                # HMI speed change inside a corner zone must not keep it on.
                 ff_target = 0.0
-                if config.FF_ENABLED and state.nav_in_corner:
-                    ff_target = (config.FF_SCALE * config.FF_DIRECTION_SIGN
+                if (config.FF_ENABLED and state.nav_in_corner
+                        and state.speed_mode in config.FF_CURVE_MODES):
+                    _c = state.curve or {}
+                    ff_target = (config.FF_SCALE * _c.get("sign", config.FF_DIRECTION_SIGN)
                                  * 0.5 * base_rpm
-                                 * (config.TRACK_WIDTH / config.CURVE_RADIUS))
+                                 * (config.TRACK_WIDTH / _c.get("radius", config.CURVE_RADIUS)))
                 # Gentle ramp when entering/deepening a corner; fast collapse on
                 # exit so the residual turn command doesn't bleed into the straight
                 # and over-rotate the AGV. ff_target is 0 outside corners (always

@@ -342,10 +342,24 @@ class SequenceEngine:
         # approaches may also use SLOW but must not get curvature feedforward.
         # "corner": false (e.g. branch / fork tags) slows down WITHOUT the
         # corner feedforward, which is tuned for the main loop's left curves.
-        if self._category(self._current_seq) == "navigation":
-            self._state.nav_in_corner = (p["speed"] == "SLOW" and p.get("corner", True))
+        # "corner" picks the curve feedforward for this zone:
+        #   true (default)  profile CURVE_DIRECTION / CURVE_RADIUS_M
+        #   "left"/"right"  that direction (radius_m optional, else profile)
+        #   false           no feedforward (straights, branches, or a tag used
+        #                   at both left and right curves — the PID steers)
+        corner = p.get("corner", True)
+        in_corner = (self._category(self._current_seq) == "navigation"
+                     and p["speed"] == "SLOW"
+                     and corner not in (False, None, "none", "off"))
+        self._state.nav_in_corner = in_corner
+        if in_corner:
+            sign = config.FF_DIRECTION_SIGN
+            if isinstance(corner, str) and corner.lower() in ("left", "right"):
+                sign = -1.0 if corner.lower() == "left" else 1.0
+            self._state.curve = {"sign": sign,
+                                 "radius": float(p.get("radius_m", config.CURVE_RADIUS))}
         else:
-            self._state.nav_in_corner = False
+            self._state.curve = None
         logger.info("[SEQ] Speed → %s", p["speed"])
 
     async def _act_set_track(self, p: dict):
