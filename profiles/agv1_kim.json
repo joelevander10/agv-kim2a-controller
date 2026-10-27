@@ -345,122 +345,133 @@
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 1 — only when CABANG 1 is selected (placed on that branch after the fork). Tag placeholder: replace 00C1 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 1 — only when CABANG 1 is selected (placed on that branch after the fork). Tag placeholder: replace 00C1 with the scanned tag.",
       "name": "branch_medium_point1",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C1", "requires_target": "point_1" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 2 — only when CABANG 2 is selected (placed on that branch after the fork). Tag placeholder: replace 00C2 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 2 — only when CABANG 2 is selected (placed on that branch after the fork). Tag placeholder: replace 00C2 with the scanned tag.",
       "name": "branch_medium_point2",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C2", "requires_target": "point_2" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 3 — only when CABANG 3 is selected (placed on that branch after the fork). Tag placeholder: replace 00C3 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 3 — only when CABANG 3 is selected (placed on that branch after the fork). Tag placeholder: replace 00C3 with the scanned tag.",
       "name": "branch_medium_point3",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C3", "requires_target": "point_3" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 4 — only when CABANG 4 is selected (placed on that branch after the fork). Tag placeholder: replace 00C4 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 4 — only when CABANG 4 is selected (placed on that branch after the fork). Tag placeholder: replace 00C4 with the scanned tag.",
       "name": "branch_medium_point4",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C4", "requires_target": "point_4" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 5 — only when CABANG 5 is selected (placed on that branch after the fork). Tag placeholder: replace 00C5 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 5 — only when CABANG 5 is selected (placed on that branch after the fork). Tag placeholder: replace 00C5 with the scanned tag.",
       "name": "branch_medium_point5",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C5", "requires_target": "point_5" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 6 — only when CABANG 6 is selected (placed on that branch after the fork). Tag placeholder: replace 00C6 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 6 — only when CABANG 6 is selected (placed on that branch after the fork). Tag placeholder: replace 00C6 with the scanned tag.",
       "name": "branch_medium_point6",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C6", "requires_target": "point_6" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 7 — only when CABANG 7 is selected (placed on that branch after the fork). Tag placeholder: replace 00C7 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 7 — only when CABANG 7 is selected (placed on that branch after the fork). Tag placeholder: replace 00C7 with the scanned tag.",
       "name": "branch_medium_point7",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C7", "requires_target": "point_7" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 8 — only when CABANG 8 is selected (placed on that branch after the fork). Tag placeholder: replace 00C8 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 8 — only when CABANG 8 is selected (placed on that branch after the fork). Tag placeholder: replace 00C8 with the scanned tag.",
       "name": "branch_medium_point8",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C8", "requires_target": "point_8" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 9 — only when CABANG 9 is selected (placed on that branch after the fork). Tag placeholder: replace 00C9 with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 9 — only when CABANG 9 is selected (placed on that branch after the fork). Tag placeholder: replace 00C9 with the scanned tag.",
       "name": "branch_medium_point9",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00C9", "requires_target": "point_9" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 10 — only when CABANG 10 is selected (placed on that branch after the fork). Tag placeholder: replace 00CA with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 10 — only when CABANG 10 is selected (placed on that branch after the fork). Tag placeholder: replace 00CA with the scanned tag.",
       "name": "branch_medium_point10",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00CA", "requires_target": "point_10" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
     },
     {
-      "_comment": "MEDIUM speed on branch 11 — only when CABANG 11 is selected (placed on that branch after the fork). Tag placeholder: replace 00CB with the scanned tag.",
+      "_comment": "MEDIUM speed + follow LEFT track on branch 11 — only when CABANG 11 is selected (placed on that branch after the fork). Tag placeholder: replace 00CB with the scanned tag.",
       "name": "branch_medium_point11",
       "category": "navigation",
       "trigger": { "type": "rfid", "rfid_tag": "00CB", "requires_target": "point_11" },
       "actions": [
-        { "type": "set_speed", "speed": "MEDIUM" }
+        { "type": "set_speed", "speed": "MEDIUM" },
+        { "type": "set_track", "side": "left" }
       ],
       "cooldown_s": 5.0,
       "requires_mode": "running"
