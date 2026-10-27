@@ -589,6 +589,7 @@ async def mode_manager(state, engine=None, manager=None):
         state.calibration_request = False
         state.autotune_request    = False
         state.rotate_request      = None    # a T/Y press before this transition is dropped
+        state.end_run_request     = None
         # selected_fork_target is intentionally NOT reset here — it's the
         # operator's chosen destination from the homepost HMI and should
         # survive a RESET/EMERGENCY/mode-switch so the operator doesn't have
@@ -596,6 +597,8 @@ async def mode_manager(state, engine=None, manager=None):
         # the operator explicitly sets a new one (or clears it) from the HMI.
         if engine is not None:
             engine.cancel_armed()
+
+    run_started_at = 0.0        # time of the last START (homepost tag guard)
 
     while True:
         if state.latest_di is None:
@@ -808,6 +811,8 @@ async def mode_manager(state, engine=None, manager=None):
                 logger.warning("START ignored — tape not detected. Place AGV on tape first.")
             else:
                 logger.info("START — launching AUTO mode.")
+                state.end_run_request = None
+                run_started_at     = time.time()
                 active_task        = asyncio.create_task(auto_mode(state, engine=engine))
                 current_mode       = "running"
                 state.current_mode = current_mode
@@ -849,6 +854,21 @@ async def mode_manager(state, engine=None, manager=None):
             state.calibration_request = False
             current_mode       = "armed"
             state.current_mode = current_mode
+
+        elif current_mode == "running" and state.end_run_request is not None:
+            _ignore = state.end_run_request
+            state.end_run_request = None
+            if time.time() - run_started_at < _ignore:
+                logger.info("[HOME] homepost tag ignored — AUTO started %.1f s ago (< %.0f s)",
+                            time.time() - run_started_at, _ignore)
+            else:
+                logger.info("[HOME] Homepost reached — braking, AUTO ends, back to ARMED. "
+                            "Press START (or G) for the next trip.")
+                await _cancel_active()
+                await _flush_and_brake()
+                _reset_sequence_state()
+                current_mode       = "armed"
+                state.current_mode = current_mode
 
         elif current_mode == "running" and reset_rising:
             logger.info("RESET — stopping AUTO, returning to ARMED.")

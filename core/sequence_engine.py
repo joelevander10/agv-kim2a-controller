@@ -76,6 +76,7 @@ class SequenceEngine:
             "straight_end":      self._act_straight_end,
             "wait_marker":       self._act_wait_marker,
             "stop_agv":          self._act_stop_agv,
+            "end_run":           self._act_end_run,
             "resume":            self._act_resume,
             "sequence_stop":     self._act_sequence_stop,
             "wait_seconds":      self._act_wait_seconds,
@@ -414,6 +415,13 @@ class SequenceEngine:
     async def _act_stop_agv(self, p: dict):
         logger.info("[SEQ] Stopping AGV")
         self._state.sequence_stop = True
+
+    async def _act_end_run(self, p: dict):
+        # Homepost: brake and end AUTO (back to ARMED, run log saved). The
+        # mode manager ignores it in the first ignore_first_s after START, so
+        # the tag the AGV starts on does not stop it again.
+        self._state.end_run_request = float(p.get("ignore_first_s", 5.0))
+        logger.info("[SEQ] End of run (homepost) — braking, back to ARMED")
 
     async def _act_resume(self, p: dict):
         self._state.sequence_stop = False

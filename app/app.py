@@ -230,7 +230,11 @@ def api_rotate():
     return jsonify({"ok": True, "message": msg})
 
 
-_VALID_FORK_TARGETS = {"point_1", "point_2", "point_3", "point_4", "point_5"}
+# CABANG 1..11 (point_1..point_11) plus any requires_target used in the profile.
+import config as _cfg
+_VALID_FORK_TARGETS = ({f"point_{i}" for i in range(1, 12)}
+                       | {s.get("trigger", {}).get("requires_target")
+                          for s in _cfg.SEQUENCES} - {None})
 
 @app.route("/api/fork_target", methods=["POST"])
 def api_fork_target():

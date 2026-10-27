@@ -31,8 +31,10 @@ Actions (one press)
           stops AUTO back to ARMED)
     T / Y rotate 180° on the tape LEFT (CCW) / RIGHT (CW)   (MANUAL/ARMED;
           press T or Y again during the turn to stop it)
+    F1 … F11  select CABANG 1 … 11 (same as "Pilih Cabang" on the HOME page;
+          any mode, kept through RESET).  F12 clears the selection.
     R  auto reverse — not on this AGV
-    7 / 8 / 9 / 0  cabang — not used on this AGV's keypad (pick it on the HMI)
+    7 / 8 / 9 / 0  not used (cabang is on F1 … F11)
 """
 import logging
 import time
@@ -65,13 +67,17 @@ PLC_OPPOSITES = (("z", "x"), ("u", "i"), ("b", "n"))
 # Kayaba keys with no matching hardware/feature on KIM2A.
 UNSUPPORTED_KEYS = {
     "r": "this AGV has no AUTO REVERSE",
-    "7": "cabang is selected on the HMI, not the keypad",
-    "8": "cabang is selected on the HMI, not the keypad",
-    "9": "cabang is selected on the HMI, not the keypad",
-    "0": "cabang is selected on the HMI, not the keypad",
+    "7": "cabang is on F1 … F11",
+    "8": "cabang is on F1 … F11",
+    "9": "cabang is on F1 … F11",
+    "0": "cabang is on F1 … F11",
 }
+# F1 … F11 = CABANG 1 … 11 (fork target point_1 … point_11), F12 = clear.
+BRANCH_KEYS = {f"f{i}": f"point_{i}" for i in range(1, 12)}
+BRANCH_CLEAR_KEY = "f12"
 ACTION_KEYS = (set(SPEED_KEYS) | set(TRACK_KEYS) | set(ROTATE_KEYS)
-               | set(UNSUPPORTED_KEYS) | {"q", "e", "g", "enter"})
+               | set(UNSUPPORTED_KEYS) | set(BRANCH_KEYS)
+               | {BRANCH_CLEAR_KEY, "q", "e", "g", "enter"})
 MOVE_WATCHDOG_S = 0.4      # same 400 ms watchdog as the web jog buttons
 
 
@@ -153,6 +159,15 @@ def handle_key(state, key, source="keyboard"):
 
     if key in UNSUPPORTED_KEYS:
         return False, UNSUPPORTED_KEYS[key]
+
+    if key in BRANCH_KEYS or key == BRANCH_CLEAR_KEY:
+        # Same as "Pilih Cabang" on the HOME page: picks which fork tags act.
+        # Not mode-gated (chosen at the homepost before START).
+        target = BRANCH_KEYS.get(key)
+        state.selected_fork_target = target
+        label = f"CABANG {target.split('_')[1]}" if target else "no CABANG"
+        logger.info("[%s] %s — %s selected", source, key.upper(), label)
+        return True, label
 
     if key == "g":
         if mode != "armed":

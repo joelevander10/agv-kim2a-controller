@@ -51,6 +51,8 @@ def _code_map():
     m[ecodes.KEY_DOWN] = "s"
     m[ecodes.KEY_LEFT] = "a"
     m[ecodes.KEY_RIGHT] = "d"
+    for i in range(1, 13):              # F1 … F11 = CABANG 1 … 11, F12 = clear
+        m[getattr(ecodes, f"KEY_F{i}")] = f"f{i}"
     m[ecodes.KEY_ENTER] = "enter"       # Enter key (and OK on many remotes) = RESET
     m[ecodes.KEY_KPENTER] = "enter"
     return m

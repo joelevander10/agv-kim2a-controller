@@ -68,6 +68,9 @@ class KinematicState:
         # Curve of the current corner zone (set_speed "corner"): {"sign": -1
         # left / +1 right, "radius": m}; None = profile defaults.
         self.curve = None
+        # Homepost tag (end_run action): seconds after START during which it is
+        # ignored; None = no request. Handled by mode_manager.
+        self.end_run_request = None
 
 
 class PerceptionState:
@@ -323,6 +326,11 @@ class AMRState:
     def sensor_hold_request(self): return self.kinematic.sensor_hold_request
     @sensor_hold_request.setter
     def sensor_hold_request(self, v): self.kinematic.sensor_hold_request = v
+
+    @property
+    def end_run_request(self): return self.kinematic.end_run_request
+    @end_run_request.setter
+    def end_run_request(self, v): self.kinematic.end_run_request = v
 
     @property
     def curve(self): return self.kinematic.curve
