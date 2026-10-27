@@ -27,12 +27,10 @@ the web STOP; an error above err_limit ends the test (the data recorded up to
 then is still used if there is enough). RFID tags are not acted on (see
 rfid_processor.py). Gains are only applied when the engineer presses APPLY.
 
-Branches: the MGS1600 reports two tracks (left_mm / right_mm). On a single
-tape they are the same; at a fork or merge they move apart. The relay test
-must not weave across a split (it would steer onto the branch and wreck the
-fit), so when the two tracks are more than FORK_GAP_MM apart the test stops
-and brakes: in the relay phase the data recorded BEFORE the split started is
-still fitted; in warm-up it aborts with a message to start further away.
+Two tracks: on a straight the MGS1600 can report a second "track" over a
+magnetic spot in the floor (or at a branch). The test then keeps the track
+nearest the last reading (like the track lock in AUTO) instead of stopping,
+so it is not pulled off the tape. Still run it on single straight tape.
 
 Ported from the AGV Kayaba controller. KIM2A differences: speed modes MAX, HIGH,
 MEDIUM, SLOW and APPROACH, no lidar, forward error sign fixed at -1 like auto_mode.
@@ -80,9 +78,6 @@ RELAY_S = 10.0             # relay test length when the cycle count is not reach
 # by at most NOISE_BUDGET of the base speed; HIGH / MAX are not affected.
 NOISE_BUDGET = 0.10
 N_MIN = 2.0
-FORK_GAP_MM = 15.0         # left/right track this far apart = branch / fork → stop the test
-FORK_START_MM = 5.0        # the split starts here — relay data from then on is dropped
-FORK_FRAMES = 2            # frames in a row above FORK_GAP_MM (ignores a single glitch)
 
 # (id, label, damping ζ, ωn = factor / T)
 DESIGNS = [
@@ -239,7 +234,6 @@ async def autotune_mode(state):
     cyc_max, cyc_min = -1e9, 1e9
     periods, amps = [], []
     ts, us, pvs = [], [], []
-    fork_frames, split_t = 0, None
 
     def finish_warmup(phase, message):
         """Warm-up never got straight (usually a big steady offset from a wheel
@@ -274,8 +268,7 @@ async def autotune_mode(state):
             return
         if relay_t0 is None or len(ts) < 2 or ts[-1] - ts[0] < MIN_RELAY_S:
             finish("failed", f"{reason} — not enough relay data (needs {MIN_RELAY_S:.0f} s). "
-                             "Use a longer straight tape (start further from any branch), "
-                             "a smaller relay or a longer time limit.")
+                             "Use a longer straight tape, a smaller relay or a longer time limit.")
             return
         try:
             r = build_result(mode, d, h, ts, us, pvs, periods[2:] or periods, amps[2:] or amps,
@@ -305,33 +298,13 @@ async def autotune_mode(state):
             if not sensor["tape_detected"]:
                 finish("aborted", "Tape lost"); break
 
-            # Branch / fork: the two tracks move apart → stop before weaving onto it.
             lm, rm = sensor.get("left_mm"), sensor.get("right_mm")
-            gap = abs(lm - rm) if lm is not None and rm is not None else 0.0
-            if gap > FORK_START_MM:
-                split_t = split_t or now
-            else:
-                split_t = None
-            fork_frames = fork_frames + 1 if gap > FORK_GAP_MM else 0
-            if fork_frames >= FORK_FRAMES:
-                why = f"Branch / fork reached (tracks {gap:.0f} mm apart)"
-                if st["phase"] == "relay":
-                    cut = (split_t or now) - 0.2          # drop the samples on the split
-                    keep = sum(1 for t in ts if t < cut)
-                    del ts[keep:], us[keep:], pvs[keep:]
-                    if switches < 3 or len(ts) < 2 or ts[-1] - ts[0] < MIN_RELAY_S:
-                        finish("failed", f"{why} — not enough relay data before the branch "
-                                         f"(needs {MIN_RELAY_S:.0f} s). Start the test further "
-                                         "from the branch, on single straight tape.")
-                    else:
-                        finish_with_fit(why, " from the data before the branch")
-                else:
-                    finish_warmup("aborted", why + " during warm-up — start the test further "
-                                  "from the branch (needs about speed × time limit metres of "
-                                  "single straight tape)")
-                break
-
-            pv = sensor["right_mm"] if state.track_follow == "right" else sensor["left_mm"]
+            pv = rm if state.track_follow == "right" else lm
+            # Two tracks apart (floor spot, or a branch): keep the one nearest
+            # the last reading instead of jumping to the other one.
+            if (config.TRACK_LOCK_ENABLED and last_pv is not None and lm is not None
+                    and rm is not None and abs(lm - rm) > config.TRACK_SPREAD_MM):
+                pv = lm if abs(lm - last_pv) <= abs(rm - last_pv) else rm
             if pv is None or abs(pv) > config.SENSOR_MAX_MM:
                 await asyncio.sleep(config.DT); continue
             if last_pv is not None and abs(pv - last_pv) > config.SENSOR_MAX_STEP_MM:
