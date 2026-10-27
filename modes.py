@@ -93,6 +93,8 @@ async def auto_mode(state, engine=None):
 
     recorder = RunRecorder()
     recorder.start()
+    rec_tag = state.latest_rfid_tag   # RFID tag already seen → not an event
+    rec_mode = None
 
     try:
         while True:
@@ -351,10 +353,34 @@ async def auto_mode(state, engine=None):
                 state.pid_output   = dbg["output"]
                 state.target_speed = current_target_speed
 
+                # Events for the run log: RFID tags read, speed-mode changes.
+                _ev = []
+                if state.latest_rfid_tag != rec_tag:
+                    rec_tag = state.latest_rfid_tag
+                    _ev.append(f"RFID {rec_tag}")
+                if state.speed_mode != rec_mode:
+                    rec_mode = state.speed_mode
+                    _ev.append(f"MODE {rec_mode}")
                 recorder.record(error_mm=dbg["e"], left_rpm=left_rpm,
                                 right_rpm=right_rpm, pid_output=dbg["output"],
                                 d_term=dbg["d"],
-                                target_speed_ms=target_speed)
+                                target_speed_ms=target_speed,
+                                speed_mode=state.speed_mode,
+                                cmd_speed_ms=current_target_speed,
+                                left_mm=sensor.get("left_mm"),
+                                right_mm=sensor.get("right_mm"),
+                                track=state.track_follow,
+                                p=dbg["p"], i=dbg["i"],
+                                ff=ff_filtered,
+                                kp=pid._kp, td=pid._td, n=pid._n,
+                                hold=int(holding),
+                                left_v=left_v, right_v=right_v,
+                                event=" | ".join(_ev))
+                if state.runlog_save_request:      # web "SAVE CURRENT RUN"
+                    state.runlog_save_request = False
+                    recorder.stop()
+                    recorder.start()
+                    rec_mode = None
 
                 # Throttle the per-cycle PID debug line (~every 25 cycles) so an
                 # accidental console DEBUG level can't flood at 100 Hz.

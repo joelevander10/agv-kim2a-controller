@@ -62,6 +62,9 @@ class KinematicState:
         self.track_noise         = {"locked": False, "events": 0, "last": None, "fork": False}
         self.sensor_hold_request = None
         self.sensor_hold_active  = False
+        # Web ERRORS page "SAVE CURRENT RUN": auto_mode saves the run
+        # recording so far (CSV + PNG) and starts a new one.
+        self.runlog_save_request = False
 
 
 class PerceptionState:
@@ -317,6 +320,11 @@ class AMRState:
     def sensor_hold_request(self): return self.kinematic.sensor_hold_request
     @sensor_hold_request.setter
     def sensor_hold_request(self, v): self.kinematic.sensor_hold_request = v
+
+    @property
+    def runlog_save_request(self): return self.kinematic.runlog_save_request
+    @runlog_save_request.setter
+    def runlog_save_request(self, v): self.kinematic.runlog_save_request = v
 
     @property
     def sensor_hold_active(self): return self.kinematic.sensor_hold_active

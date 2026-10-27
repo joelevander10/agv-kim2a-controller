@@ -78,6 +78,7 @@ class RunRecorder:
         self._pid_outputs    = deque(maxlen=PLOT_MAX_SAMPLES)
         self._d_terms        = deque(maxlen=PLOT_MAX_SAMPLES)
         self._target_speeds  = deque(maxlen=PLOT_MAX_SAMPLES)
+        self._extra          = {}      # extra CSV columns: name -> deque
         self._active         = False
 
     def start(self):
@@ -91,11 +92,13 @@ class RunRecorder:
         self._pid_outputs    = deque(maxlen=PLOT_MAX_SAMPLES)
         self._d_terms        = deque(maxlen=PLOT_MAX_SAMPLES)
         self._target_speeds  = deque(maxlen=PLOT_MAX_SAMPLES)
+        self._extra          = {}
         self._active         = True
         logger.info("[PLOT] Recording started.")
 
     def record(self, error_mm: float, left_rpm: float, right_rpm: float,
-               pid_output: float, d_term: float, target_speed_ms: float = 0.0):
+               pid_output: float, d_term: float, target_speed_ms: float = 0.0,
+               **extra):
         """
         Call once per PID cycle inside auto_mode.
 
@@ -106,6 +109,9 @@ class RunRecorder:
             pid_output     — combined PID output
             d_term         — filtered derivative term
             target_speed_ms — current desired speed setpoint in m/s
+            **extra        — any further named values (speed_mode, left_mm,
+                             right_mm, p, i, kp, event …): one CSV column each,
+                             after the standard ones. Blank where not given.
         """
         if not PLOTTING_ENABLED or not self._active:
             return
@@ -116,6 +122,15 @@ class RunRecorder:
         self._pid_outputs.append(pid_output)
         self._d_terms.append(d_term)
         self._target_speeds.append(target_speed_ms)
+        n = len(self._times)
+        for k, v in extra.items():
+            col = self._extra.get(k)
+            if col is None:
+                col = self._extra[k] = deque([""] * (n - 1), maxlen=PLOT_MAX_SAMPLES)
+            col.append(v)
+        for col in self._extra.values():
+            while len(col) < n:
+                col.append("")
 
     def stop(self):
         """
@@ -140,7 +155,8 @@ class RunRecorder:
         args = (list(self._times), list(self._errors),
                 list(self._left_rpms), list(self._right_rpms),
                 list(self._pid_outputs), list(self._d_terms),
-                list(self._target_speeds))
+                list(self._target_speeds),
+                {k: list(v) for k, v in self._extra.items()})
         threading.Thread(target=_save_safe, args=args, daemon=True).start()
 
 
@@ -148,18 +164,24 @@ class RunRecorder:
 #  SAVE FUNCTION
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _fmt(v):
+    if isinstance(v, float):
+        return f"{v:.3f}"
+    return "" if v is None else v
+
+
 def _save_safe(times, errors, left_rpms, right_rpms, pid_outputs, d_terms,
-               target_speeds):
+               target_speeds, extra=None):
     """Thread entry point — never let a plotting failure escape the worker."""
     try:
         _save_outputs(times, errors, left_rpms, right_rpms, pid_outputs,
-                      d_terms, target_speeds)
+                      d_terms, target_speeds, extra)
     except Exception as e:
         logger.error("[PLOT] ERROR saving output: %s", e)
 
 
 def _save_outputs(times, errors, left_rpms, right_rpms, pid_outputs, d_terms,
-                  target_speeds):
+                  target_speeds, extra=None):
     os.makedirs(PLOT_DIR, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path  = os.path.join(PLOT_DIR, f"{timestamp}_data.csv")
@@ -168,10 +190,13 @@ def _save_outputs(times, errors, left_rpms, right_rpms, pid_outputs, d_terms,
     # ── CSV first — data is on disk before matplotlib even starts ─────────────
     with open(csv_path, "w", newline="") as f:
         writer = csv_module.writer(f)
+        extra = extra or {}
+        ex_keys = list(extra)
         writer.writerow(["time_s", "error_mm", "left_rpm", "right_rpm",
-                         "pid_output", "d_term", "target_speed_ms"])
-        for row in zip(times, errors, left_rpms, right_rpms, pid_outputs,
-                       d_terms, target_speeds):
+                         "pid_output", "d_term", "target_speed_ms"] + ex_keys)
+        for idx, row in enumerate(zip(times, errors, left_rpms, right_rpms, pid_outputs,
+                                      d_terms, target_speeds)):
+            ex = [_fmt(extra[k][idx]) if idx < len(extra[k]) else "" for k in ex_keys]
             writer.writerow([
                 f"{row[0]:.4f}",
                 f"{row[1]:.3f}",
@@ -180,7 +205,7 @@ def _save_outputs(times, errors, left_rpms, right_rpms, pid_outputs, d_terms,
                 f"{row[4]:.3f}",
                 f"{row[5]:.3f}",
                 f"{row[6]:.3f}",
-            ])
+            ] + ex)
     logger.info("[PLOT] CSV  saved → %s", csv_path)
 
     # ── PNG ───────────────────────────────────────────────────────────────────

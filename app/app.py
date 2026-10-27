@@ -13,7 +13,9 @@ import re
 import subprocess
 import time
 import threading
-from flask import Flask, render_template, jsonify, request
+import io
+import zipfile
+from flask import Flask, render_template, jsonify, request, send_from_directory, send_file
 from logger import get_error_log
 import keyboard_control
 import logging
@@ -318,6 +320,102 @@ def errors():
 @app.route("/api/errors")
 def api_errors():
     return jsonify(get_error_log())
+
+
+# ── Run logs: download from the ERRORS page ───────────────────────────────────
+# Every AUTO run is recorded by debugging/plotter.py to analysis_plot/
+# <YYYYMMDD_HHMMSS>_data.csv (+ _analysisplot.png); the controller's text log
+# is logs/agv_<YYYYMMDD_HHMMSS>.log. Only these names can be downloaded.
+_REPO = os.path.dirname(_here)
+_RUN_RE = re.compile(r"^(\d{8}_\d{6})_(data\.csv|analysisplot\.png)$")
+_LOG_RE = re.compile(r"^agv_\d{8}_\d{6}\.log(\.\d+)?$")
+
+
+def _plot_dir():
+    from debugging.plotter import PLOT_DIR
+    return PLOT_DIR
+
+
+def _log_dir():
+    for d in (os.path.join(_REPO, "logs"), os.path.abspath("logs")):
+        if os.path.isdir(d):
+            return d
+    return os.path.join(_REPO, "logs")
+
+
+def _runs():
+    """Recorded runs, newest first: [{run, time, csv, png, size}]."""
+    d = _plot_dir()
+    runs = {}
+    try:
+        names = os.listdir(d)
+    except OSError:
+        names = []
+    for n in names:
+        m = _RUN_RE.match(n)
+        if not m:
+            continue
+        p = os.path.join(d, n)
+        r = runs.setdefault(m.group(1), {"run": m.group(1), "time": 0, "csv": None,
+                                         "png": None, "size": 0})
+        r["csv" if n.endswith(".csv") else "png"] = n
+        r["time"] = max(r["time"], os.path.getmtime(p))
+        r["size"] += os.path.getsize(p)
+    return sorted(runs.values(), key=lambda r: r["time"], reverse=True)
+
+
+def _logs():
+    d = _log_dir()
+    try:
+        names = [n for n in os.listdir(d) if _LOG_RE.match(n)]
+    except OSError:
+        names = []
+    out = [{"name": n, "time": os.path.getmtime(os.path.join(d, n)),
+            "size": os.path.getsize(os.path.join(d, n))} for n in names]
+    return sorted(out, key=lambda r: r["time"], reverse=True)
+
+
+@app.route("/api/runlogs")
+def api_runlogs():
+    return jsonify({"runs": _runs()[:30], "logs": _logs()[:10],
+                    "recording": bool(_state and _state.current_mode == "running")})
+
+
+@app.route("/api/runlogs/file/<name>")
+def api_runlogs_file(name):
+    if _RUN_RE.match(name):
+        return send_from_directory(_plot_dir(), name, as_attachment=True)
+    if _LOG_RE.match(name):
+        return send_from_directory(_log_dir(), name, as_attachment=True)
+    return jsonify({"error": "unknown file"}), 404
+
+
+@app.route("/api/runlogs/zip")
+def api_runlogs_zip():
+    """The newest n runs (CSV + PNG) and the newest controller log, one zip."""
+    n = max(1, min(int(request.args.get("n", 5)), 30))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for r in _runs()[:n]:
+            for f in (r["csv"], r["png"]):
+                if f:
+                    z.write(os.path.join(_plot_dir(), f), f"analysis_plot/{f}")
+        for lg in _logs()[:1]:
+            z.write(os.path.join(_log_dir(), lg["name"]), f"logs/{lg['name']}")
+    buf.seek(0)
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"agv_runlogs_{stamp}.zip")
+
+
+@app.route("/api/runlogs/save", methods=["POST"])
+def api_runlogs_save():
+    """Save the AUTO run recorded so far without stopping the AGV."""
+    if _state is None or _state.current_mode != "running":
+        return jsonify({"ok": False, "error": "no AUTO run is being recorded "
+                        "(a run is saved by itself when AUTO ends)"}), 409
+    _state.runlog_save_request = True
+    return jsonify({"ok": True})
 
 
 @app.route("/io")

@@ -81,9 +81,35 @@
     border-right:  2px solid #fff;
     border-bottom: 2px solid #fff;
     overflow-y: auto;
-    max-height: calc(100vh - 220px);
+    max-height: calc(100vh - 480px);
+    min-height: 200px;
     padding: 6px;
   }
+
+  /* ── Run logs (AUTO run recordings + controller log) ── */
+  #runlogs { background: #c0c0c0; padding: 6px 10px; margin-bottom: 10px; }
+  .rl-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 6px; }
+  .rl-title { font-size: 15px; font-weight: bold; color: #000080; letter-spacing: 1px; }
+  .rl-note  { font-size: 12px; color: #404040; flex: 1; min-width: 240px; }
+  .rl-btn {
+    padding: 5px 14px; font-family: inherit; font-size: 14px; font-weight: bold;
+    cursor: pointer; text-decoration: none; color: #000; background: #c0c0c0;
+    border-top: 2px solid #fff; border-left: 2px solid #fff;
+    border-right: 2px solid #808080; border-bottom: 2px solid #808080;
+  }
+  .rl-btn.blue { background: #000080; color: #fff; }
+  .rl-btn.save { background: #006000; color: #fff; }
+  .rl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #rl-status { font-size: 13px; font-weight: bold; }
+  #rl-list {
+    max-height: 170px; overflow-y: auto; background: #fff; font-size: 14px;
+    border-top: 2px solid #808080; border-left: 2px solid #808080;
+    border-right: 2px solid #fff; border-bottom: 2px solid #fff;
+  }
+  #rl-list table { width: 100%; border-collapse: collapse; }
+  #rl-list td { padding: 3px 8px; border-bottom: 1px solid #e0e0e0; white-space: nowrap; }
+  #rl-list td.dim { color: #606060; }
+  #rl-list a { color: #000080; font-weight: bold; margin-right: 12px; }
 
   .log-entry {
     display: flex;
@@ -164,6 +190,20 @@
   </label>
   <span id="restart-status"></span>
   <button id="btn-restart" onclick="restartController()" disabled>RESTART CONTROLLER</button>
+</div>
+
+<div id="runlogs" class="raised">
+  <div class="rl-head">
+    <span class="rl-title">RUN LOGS</span>
+    <span class="rl-note">Every AUTO run is recorded (error, L/R RPM, PID terms, speed mode, RFID tags).
+      It is saved when AUTO ends (RESET) — or now with SAVE CURRENT RUN.</span>
+    <span id="rl-status"></span>
+    <button class="rl-btn save" id="btn-saverun" onclick="saveRun()">SAVE CURRENT RUN</button>
+    <a class="rl-btn blue" href="/api/runlogs/zip?n=5">DOWNLOAD LATEST 5 (ZIP)</a>
+  </div>
+  <div id="rl-list"><table><tbody id="rl-body">
+    <tr><td class="dim">Loading…</td></tr>
+  </tbody></table></div>
 </div>
 
 <div id="log-container">
@@ -301,6 +341,53 @@ function restartController() {
 
 pollRestartMode();
 setInterval(pollRestartMode, 1000);
+
+// ── Run logs ───────────────────────────────────────────────────────────────
+function _runTime(run) {   // "20261027_113412" -> "2026-10-27 11:34:12"
+  return run.slice(0,4) + '-' + run.slice(4,6) + '-' + run.slice(6,8) + ' ' +
+         run.slice(9,11) + ':' + run.slice(11,13) + ':' + run.slice(13,15);
+}
+function _kb(b) { return b >= 1048576 ? (b/1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b/1024)) + ' kB'; }
+
+function pollRunLogs() {
+  fetch('/api/runlogs')
+    .then(r => r.json())
+    .then(d => {
+      const body = document.getElementById('rl-body');
+      const rows = [];
+      (d.runs || []).forEach((r, i) => {
+        rows.push('<tr><td>' + (i === 0 ? '<b>' : '') + _runTime(r.run) + (i === 0 ? ' (newest)</b>' : '') +
+          '</td><td class="dim">' + _kb(r.size) + '</td><td>' +
+          (r.csv ? '<a href="/api/runlogs/file/' + r.csv + '">CSV</a>' : '') +
+          (r.png ? '<a href="/api/runlogs/file/' + r.png + '">PLOT</a>' : '') + '</td></tr>');
+      });
+      (d.logs || []).slice(0, 2).forEach(l => {
+        rows.push('<tr><td>Controller log ' + new Date(l.time * 1000).toLocaleString() +
+          '</td><td class="dim">' + _kb(l.size) + '</td><td><a href="/api/runlogs/file/' +
+          l.name + '">LOG</a></td></tr>');
+      });
+      body.innerHTML = rows.length ? rows.join('')
+        : '<tr><td class="dim">No runs recorded yet — run AUTO, then RESET (or SAVE CURRENT RUN).</td></tr>';
+      document.getElementById('btn-saverun').disabled = !d.recording;
+    })
+    .catch(() => {});
+}
+
+function saveRun() {
+  const st = document.getElementById('rl-status');
+  fetch('/api/runlogs/save', { method: 'POST' })
+    .then(r => r.json().then(d => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      st.textContent = ok ? 'Saving… (appears in a few seconds)' : (d.error || 'failed');
+      st.style.color = ok ? '#006000' : '#a00000';
+      setTimeout(pollRunLogs, 3000);
+      setTimeout(() => { st.textContent = ''; }, 6000);
+    })
+    .catch(() => { st.textContent = 'NO CONN'; st.style.color = '#a00000'; });
+}
+
+pollRunLogs();
+setInterval(pollRunLogs, 5000);
 </script>
 </body>
 </html>
