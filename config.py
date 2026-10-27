@@ -194,6 +194,9 @@ TRACK_SPREAD_MM    = _params["can_sensor"].get("TRACK_SPREAD_MM", 15.0)
 FORK_SETTLE_S      = _params["can_sensor"].get("FORK_SETTLE_S", 0.5)
 FORK_ZONE_MAX_S    = _params["can_sensor"].get("FORK_ZONE_MAX_S", 60.0)
 SENSOR_HOLD_MAX_M  = _params["can_sensor"].get("SENSOR_HOLD_MAX_M", 1.0)
+# RFID straight zone (straight_start … straight_end): longest distance driven
+# without the sensor if the END tag is missed.
+STRAIGHT_ZONE_MAX_M = _params["can_sensor"].get("STRAIGHT_ZONE_MAX_M", 3.0)
 
 # ── RFID ──────────────────────────────────────────────────────────────────────
 RFID_INIT_CMD       = bytes.fromhex(_params["rfid"]["RFID_INIT_CMD_HEX"])

@@ -72,6 +72,8 @@ class SequenceEngine:
             "set_speed":         self._act_set_speed,
             "set_track":         self._act_set_track,
             "sensor_hold":       self._act_sensor_hold,
+            "straight_start":    self._act_straight_start,
+            "straight_end":      self._act_straight_end,
             "wait_marker":       self._act_wait_marker,
             "stop_agv":          self._act_stop_agv,
             "resume":            self._act_resume,
@@ -362,8 +364,18 @@ class SequenceEngine:
         # Floor spot that shifts the tape reading: cross the next distance_m
         # without the sensor, steering held as it was (auto_mode).
         dist = float(p.get("distance_m", 0.3))
-        self._state.sensor_hold_request = dist
+        self._state.sensor_hold_request = ("dist", dist)
         logger.info("[SEQ] Sensor hold → %.2f m", dist)
+
+    async def _act_straight_start(self, p: dict):
+        # Floor-spot zone: drive straight without the sensor until a
+        # straight_end tag (or max_m, default STRAIGHT_ZONE_MAX_M) — auto_mode.
+        self._state.sensor_hold_request = ("tag", p.get("max_m"))
+        logger.info("[SEQ] Straight zone START (sensor ignored until the END tag)")
+
+    async def _act_straight_end(self, p: dict):
+        self._state.sensor_hold_request = ("end", None)
+        logger.info("[SEQ] Straight zone END (sensor on)")
 
     async def _act_wait_marker(self, p: dict):
         side     = p["side"]

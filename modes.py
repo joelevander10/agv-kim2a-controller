@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import logging
 import time
 
@@ -18,6 +19,26 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 #  AUTO MODE  (forward tape-following only)
 # ══════════════════════════════════════════════════════════════════════════════
+
+def _mode_gains(mode):
+    """(KP, TD, N, V_RED_COEF, clamp_hi, clamp_lo) of a speed mode, read live
+    from config so PARAMS changes apply at once. Unknown modes run as HIGH."""
+    c = config.OUTPUT_CLAMP_RPM
+    if mode == "MEDIUM":
+        return (config.KP_MEDIUM, config.TD_MEDIUM, config.N_MEDIUM, config.V_RED_COEF_MEDIUM, c, -c)
+    if mode == "MAX":
+        return (config.KP_MAX, config.TD_MAX, config.N_MAX, config.V_RED_COEF_MAX, c, -c)
+    if mode == "SLOW":
+        return (config.KP_SLOW, config.TD_SLOW, config.N_SLOW, config.V_RED_COEF_SLOW, c, -c)
+    if mode == "APPROACH":
+        # Asymmetric clamp: barely steer into the one-sided guide bar (it
+        # centres the AGV mechanically), keep authority to steer off the bar.
+        # Positive output = yaw right = into the bar.
+        return (config.KP_APPROACH, config.TD_APPROACH, config.N_APPROACH,
+                config.V_RED_COEF_APPROACH,
+                config.OUTPUT_CLAMP_INTO_BAR_APPROACH, -config.OUTPUT_CLAMP_AWAY_APPROACH)
+    return (config.KP, config.TD, config.N, config.V_RED_COEF, c, -c)
+
 
 async def auto_mode(state, engine=None):
     """Forward tape-following PID loop.
@@ -61,7 +82,13 @@ async def auto_mode(state, engine=None):
     travelled_m          = 0.0    # distance driven in AUTO (from the commanded speed)
     hold_until_m         = None   # sensor_hold: steer without the sensor until here
     hold_pv              = 0.0    # reading frozen at the start of the hold
+    hold_out             = 0.0    # steering used while the sensor is ignored (rpm)
+    hold_kind            = None   # "dist" (sensor_hold) | "tag" (straight_start … straight_end)
+    hold_end_tag         = False  # the straight zone was ended by its end tag
+    recent_out           = collections.deque(maxlen=100)   # last ~1 s of steering output
     resync_d             = False  # first frame after a hold: no derivative kick
+    blend_from           = None   # gains of the previous speed mode while the speed changes
+    blend_v0             = 0.0    # speed when the speed mode changed
     frame_t              = None   # perf_counter of the previous sensor frame
 
     recorder = RunRecorder()
@@ -117,44 +144,35 @@ async def auto_mode(state, engine=None):
             else:
                 target_speed = config.AUTO_TARGET_HIGH_SPEED
 
-            # Only switch gains when speed_mode actually changes — avoids
-            # redundant recomputation of the derivative filter coefficient.
+            # Gains follow the ACTUAL speed: when the speed mode changes (e.g. a
+            # tag SLOW -> MEDIUM after a curve) the new gains would otherwise
+            # apply at once while the AGV is still at the old speed — weak
+            # MEDIUM gains at 0.09 m/s let it drift off as it leaves the curve.
+            # So the gains are blended from the old mode's to the new mode's as
+            # the commanded speed ramps from the old speed to the new one.
+            # APPROACH (guide-bar clamp) always switches at once.
             if state.speed_mode != last_speed_mode:
-                if state.speed_mode == "HIGH":
-                    pid.update_gains(config.KP, config.TD, config.N,
-                                     config.V_RED_COEF,
-                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
-                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
-                elif state.speed_mode == "MEDIUM":
-                    pid.update_gains(config.KP_MEDIUM, config.TD_MEDIUM,
-                                     config.N_MEDIUM, config.V_RED_COEF_MEDIUM,
-                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
-                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
-                elif state.speed_mode == "MAX":
-                    pid.update_gains(config.KP_MAX, config.TD_MAX,
-                                     config.N_MAX, config.V_RED_COEF_MAX,
-                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
-                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
-                elif state.speed_mode == "APPROACH":
-                    # Asymmetric clamp: barely steer into the one-sided guide bar
-                    # (let it center the AGV mechanically), keep authority to steer
-                    # off the bar. Positive output = yaw right = into the bar.
-                    pid.update_gains(config.KP_APPROACH, config.TD_APPROACH,
-                                     config.N_APPROACH, config.V_RED_COEF_APPROACH,
-                                     clamp_hi=config.OUTPUT_CLAMP_INTO_BAR_APPROACH,
-                                     clamp_lo=-config.OUTPUT_CLAMP_AWAY_APPROACH)
-                elif state.speed_mode == "SLOW":
-                    pid.update_gains(config.KP_SLOW, config.TD_SLOW,
-                                     config.N_SLOW, config.V_RED_COEF_SLOW,
-                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
-                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
+                if (last_speed_mode is not None
+                        and "APPROACH" not in (state.speed_mode, last_speed_mode)
+                        and abs(target_speed - current_target_speed) > 0.01):
+                    blend_from = _gains_now if blend_from is not None else _mode_gains(last_speed_mode)
+                    blend_v0 = current_target_speed
                 else:
-                    # Unknown mode runs at HIGH speed (above) — use HIGH gains.
-                    pid.update_gains(config.KP, config.TD, config.N,
-                                     config.V_RED_COEF,
-                                     clamp_hi=config.OUTPUT_CLAMP_RPM,
-                                     clamp_lo=-config.OUTPUT_CLAMP_RPM)
+                    blend_from = None
                 last_speed_mode = state.speed_mode
+            _to = _mode_gains(state.speed_mode)
+            if blend_from is not None and abs(target_speed - blend_v0) > 1e-6:
+                _f = (current_target_speed - blend_v0) / (target_speed - blend_v0)
+                _f = max(0.0, min(1.0, _f))
+                if _f >= 1.0:
+                    blend_from = None
+                    _gains_now = _to
+                else:
+                    _gains_now = tuple(a + _f * (b - a) for a, b in zip(blend_from, _to))
+            else:
+                blend_from = None
+                _gains_now = _to
+            pid.update_gains(*_gains_now[:4], clamp_hi=_gains_now[4], clamp_lo=_gains_now[5])
 
             # ── Drain sensor queue — keep only the latest frame ───────────────
             sensor = None
@@ -165,26 +183,47 @@ async def auto_mode(state, engine=None):
 
                 logger.debug("[AUTO] left_marker=%s", sensor["left_marker"])
 
-                # ── Distance driven + sensor hold (RFID "sensor_hold") ────────
-                # A tag placed just before a floor spot that shifts the reading
-                # (the spot and the tape look like one wider tape) makes the AGV
-                # cross the next distance_m WITHOUT the sensor: the reading is
-                # frozen at its value before the spot, so the steering stays as
-                # it was (go straight on a straight). Tape loss is ignored there.
+                # ── Distance driven + driving without the sensor ──────────────
+                # Over floor spots that upset the reading the AGV can drive
+                # straight WITHOUT the sensor, keeping the average steering of
+                # the last ~1 s (= what it needed to run straight there):
+                #   RFID "sensor_hold"     for the next distance_m (≤ SENSOR_HOLD_MAX_M)
+                #   RFID "straight_start"  until an RFID "straight_end" tag, at most
+                #                          STRAIGHT_ZONE_MAX_M (missed end tag → the
+                #                          AGV follows the tape again).
+                # Tape loss is ignored inside. Distance = commanded speed × time.
                 _ft = time.perf_counter()
                 _fdt = 0.0 if frame_t is None else min(max(_ft - frame_t, 0.0), 0.2)
                 frame_t = _ft
                 travelled_m += current_target_speed * _fdt
-                if state.sensor_hold_request is not None:
-                    _d = max(0.0, min(float(state.sensor_hold_request), config.SENSOR_HOLD_MAX_M))
+                _req = state.sensor_hold_request
+                if _req is not None:
                     state.sensor_hold_request = None
-                    hold_until_m = travelled_m + _d
-                    hold_pv = last_valid_pv if last_valid_pv is not None else 0.0
-                    logger.info("[AUTO] sensor hold %.2f m — steering held, sensor ignored", _d)
+                    _kind, _val = _req if isinstance(_req, tuple) else ("dist", _req)
+                    if _kind == "end":
+                        if hold_until_m is not None:
+                            hold_until_m, hold_end_tag = travelled_m, True
+                            logger.info("[AUTO] straight zone END tag")
+                    else:
+                        if _kind == "tag":
+                            _d = min(float(_val or config.STRAIGHT_ZONE_MAX_M), config.STRAIGHT_ZONE_MAX_M)
+                        else:
+                            _d = max(0.0, min(float(_val), config.SENSOR_HOLD_MAX_M))
+                        hold_kind, hold_end_tag = _kind, False
+                        hold_until_m = travelled_m + _d
+                        hold_pv = last_valid_pv if last_valid_pv is not None else 0.0
+                        hold_out = sum(recent_out) / len(recent_out) if recent_out else 0.0
+                        logger.info("[AUTO] %s — driving straight without the sensor "
+                                    "(steering %+.1f rpm, max %.2f m)",
+                                    "straight zone START tag" if _kind == "tag" else "sensor hold",
+                                    hold_out, _d)
                 holding = hold_until_m is not None and travelled_m < hold_until_m
                 if hold_until_m is not None and not holding:
+                    if hold_kind == "tag" and not hold_end_tag:
+                        logger.warning("[AUTO] straight zone: no END tag within %.1f m — "
+                                       "following the tape again", config.STRAIGHT_ZONE_MAX_M)
                     hold_until_m, last_valid_pv, resync_d = None, None, True
-                    logger.info("[AUTO] sensor hold ended — following the tape again")
+                    logger.info("[AUTO] sensor back on — following the tape again")
                 state.sensor_hold_active = holding
 
                 # ── Tape-loss guard ───────────────────────────────────────────
@@ -280,11 +319,18 @@ async def auto_mode(state, engine=None):
                 ff_filtered += _ff_alpha * (ff_target - ff_filtered)
 
                 # ── PID compute ───────────────────────────────────────────────
-                if resync_d:                      # reading may have moved during a hold
-                    pid.last_e, resync_d = error_sign * pv, False
-                left_rpm, right_rpm, dbg = pid.compute(pv, base_rpm, error_sign,
-                                                       feedforward=ff_filtered,
-                                                       steer_limit=motion.steer_limit(base_rpm))
+                if holding:
+                    # Sensor ignored: keep the average steering from before.
+                    left_rpm, right_rpm = base_rpm + hold_out, base_rpm - hold_out
+                    dbg = {"e": 0.0, "p": 0.0, "i": 0.0, "d": 0.0, "output": hold_out,
+                           "output_total": hold_out, "speed_reduction": 0.0}
+                else:
+                    if resync_d:                  # reading may have moved during a hold
+                        pid.last_e, resync_d = error_sign * pv, False
+                    left_rpm, right_rpm, dbg = pid.compute(pv, base_rpm, error_sign,
+                                                           feedforward=ff_filtered,
+                                                           steer_limit=motion.steer_limit(base_rpm))
+                    recent_out.append(dbg["output_total"])
                 # Near top speed one wheel would need more than 5 V and get
                 # clipped, losing half the steering. Slow BOTH wheels by the
                 # excess instead so the left/right difference is kept (as Kayaba).
