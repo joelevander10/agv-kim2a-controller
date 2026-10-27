@@ -188,6 +188,7 @@ def handle_key(state, key, source="keyboard"):
         side = TRACK_KEYS[key]
         if mode in ("armed", "running"):
             state.track_follow = side        # read every cycle by auto_mode
+            state.track_set_seq += 1         # starts a fork area (core/track_select.py)
             logger.info("[%s] %s — forward track %s (manual)", source, key.upper(), side.upper())
             return True, f"forward track {side.upper()}"
         return False, f"track keys work in ARMED/RUNNING (now {mode})"

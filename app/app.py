@@ -104,6 +104,8 @@ def _build_state_snapshot():
         "kb_mode_override":     s.kb_mode_override,
         "keypad_devices":       list(s.keypad_devices),
         "rotate_status":        dict(s.rotate_status or {}),
+        "track_noise":          dict(s.track_noise or {}),
+        "sensor_hold_active":   s.sensor_hold_active,
     }
 
     # ── What the AGV is writing to the PLC right now ──────────────────────────

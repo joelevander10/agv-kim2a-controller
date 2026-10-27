@@ -183,6 +183,18 @@ CAN_NODE_ID      = _params["can_sensor"]["CAN_NODE_ID"]
 SENSOR_MAX_MM      = _params["can_sensor"].get("SENSOR_MAX_MM", 100.0)
 SENSOR_MAX_STEP_MM = _params["can_sensor"].get("SENSOR_MAX_STEP_MM", 40.0)
 
+# Floor disturbances (core/track_select.py). Left and right track more than
+# TRACK_SPREAD_MM apart outside a fork area = a magnetic spot under the floor:
+# follow the track nearest the last good reading. A fork area starts at every
+# set_track tag / K-L key and ends FORK_SETTLE_S after the tracks came back
+# together (or after FORK_ZONE_MAX_S). SENSOR_HOLD_MAX_M caps an RFID
+# "sensor_hold" (cross a spot without the sensor).
+TRACK_LOCK_ENABLED = bool(_params["can_sensor"].get("TRACK_LOCK_ENABLED", True))
+TRACK_SPREAD_MM    = _params["can_sensor"].get("TRACK_SPREAD_MM", 15.0)
+FORK_SETTLE_S      = _params["can_sensor"].get("FORK_SETTLE_S", 0.5)
+FORK_ZONE_MAX_S    = _params["can_sensor"].get("FORK_ZONE_MAX_S", 60.0)
+SENSOR_HOLD_MAX_M  = _params["can_sensor"].get("SENSOR_HOLD_MAX_M", 1.0)
+
 # ── RFID ──────────────────────────────────────────────────────────────────────
 RFID_INIT_CMD       = bytes.fromhex(_params["rfid"]["RFID_INIT_CMD_HEX"])
 # RFID_COMMANDS kept for backwards-compat if old parameters.json is used

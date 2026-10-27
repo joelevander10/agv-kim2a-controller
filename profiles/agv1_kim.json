@@ -116,7 +116,13 @@
     "CAN_NODE_ID": 6,
     "_comment_limits": "Reject |left_mm|>SENSOR_MAX_MM; clamp per-cycle jumps > SENSOR_MAX_STEP_MM",
     "SENSOR_MAX_MM": 100.0,
-    "SENSOR_MAX_STEP_MM": 40.0
+    "SENSOR_MAX_STEP_MM": 40.0,
+    "_comment_floor_spots": "Floor magnetic disturbances. A: left/right track more than TRACK_SPREAD_MM apart outside a fork area -> follow the track nearest the last reading (fork area = from a set_track tag / K-L key until the tracks are back together FORK_SETTLE_S, max FORK_ZONE_MAX_S). B (spot shifts the reading): put an RFID tag just before it with action {\"type\": \"sensor_hold\", \"distance_m\": 0.5} - the AGV crosses that distance with the steering held and the sensor ignored (max SENSOR_HOLD_MAX_M).",
+    "TRACK_LOCK_ENABLED": true,
+    "TRACK_SPREAD_MM": 15.0,
+    "FORK_SETTLE_S": 0.5,
+    "FORK_ZONE_MAX_S": 60.0,
+    "SENSOR_HOLD_MAX_M": 1.0
   },
 
   "rfid": {

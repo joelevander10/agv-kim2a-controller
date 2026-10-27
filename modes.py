@@ -9,6 +9,7 @@ import autotune
 import rotate
 
 from core.pid import PIDController
+from core.track_select import TrackSelector
 from debugging.plotter import RunRecorder
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,12 @@ async def auto_mode(state, engine=None):
     _dbg_count           = 0      # throttles the per-cycle PID debug log
     ff_filtered          = 0.0    # low-pass filtered curvature feedforward (rpm)
     prox_was_active      = False  # edge-detect for the DI proximity station marker
+    selector             = TrackSelector()  # fork tracks vs floor-disturbance "tracks"
+    travelled_m          = 0.0    # distance driven in AUTO (from the commanded speed)
+    hold_until_m         = None   # sensor_hold: steer without the sensor until here
+    hold_pv              = 0.0    # reading frozen at the start of the hold
+    resync_d             = False  # first frame after a hold: no derivative kick
+    frame_t              = None   # perf_counter of the previous sensor frame
 
     recorder = RunRecorder()
     recorder.start()
@@ -72,6 +79,9 @@ async def auto_mode(state, engine=None):
                 pid.reset()
                 last_valid_pv = None
                 ff_filtered   = 0.0
+                hold_until_m  = None
+                state.sensor_hold_request = None
+                state.sensor_hold_active  = False
                 await asyncio.sleep(config.DT)
                 continue
 
@@ -155,8 +165,30 @@ async def auto_mode(state, engine=None):
 
                 logger.debug("[AUTO] left_marker=%s", sensor["left_marker"])
 
+                # ── Distance driven + sensor hold (RFID "sensor_hold") ────────
+                # A tag placed just before a floor spot that shifts the reading
+                # (the spot and the tape look like one wider tape) makes the AGV
+                # cross the next distance_m WITHOUT the sensor: the reading is
+                # frozen at its value before the spot, so the steering stays as
+                # it was (go straight on a straight). Tape loss is ignored there.
+                _ft = time.perf_counter()
+                _fdt = 0.0 if frame_t is None else min(max(_ft - frame_t, 0.0), 0.2)
+                frame_t = _ft
+                travelled_m += current_target_speed * _fdt
+                if state.sensor_hold_request is not None:
+                    _d = max(0.0, min(float(state.sensor_hold_request), config.SENSOR_HOLD_MAX_M))
+                    state.sensor_hold_request = None
+                    hold_until_m = travelled_m + _d
+                    hold_pv = last_valid_pv if last_valid_pv is not None else 0.0
+                    logger.info("[AUTO] sensor hold %.2f m — steering held, sensor ignored", _d)
+                holding = hold_until_m is not None and travelled_m < hold_until_m
+                if hold_until_m is not None and not holding:
+                    hold_until_m, last_valid_pv, resync_d = None, None, True
+                    logger.info("[AUTO] sensor hold ended — following the tape again")
+                state.sensor_hold_active = holding
+
                 # ── Tape-loss guard ───────────────────────────────────────────
-                if not sensor["tape_detected"]:
+                if not sensor["tape_detected"] and not holding:
                     logger.warning("[AUTO] LOST TAPE — stopping")
                     await motion.set_brake(state)
                     current_target_speed = 0.0
@@ -206,8 +238,16 @@ async def auto_mode(state, engine=None):
                 # chose (default left). On a single line both readings are
                 # superimposed, so switching there is seamless; mid-fork the
                 # slew clamp below bounds any residual step.
-                pv = (sensor["right_mm"] if state.track_follow == "right"
-                      else sensor["left_mm"])
+                # Outside a fork area a second "track" is a floor disturbance:
+                # the selector keeps the track nearest the last good reading
+                # (core/track_select.py).
+                if holding:
+                    pv = hold_pv
+                else:
+                    pv, _ = selector.select(sensor, state.track_follow, state.track_set_seq,
+                                            last_valid_pv, time.perf_counter())
+                    state.track_noise = {"locked": selector.locked, "events": selector.events,
+                                         "last": selector.last_event, "fork": selector.fork}
                 if pv is None or abs(pv) > config.SENSOR_MAX_MM:
                     _dbg_count += 1
                     if _dbg_count % 25 == 0:
@@ -240,6 +280,8 @@ async def auto_mode(state, engine=None):
                 ff_filtered += _ff_alpha * (ff_target - ff_filtered)
 
                 # ── PID compute ───────────────────────────────────────────────
+                if resync_d:                      # reading may have moved during a hold
+                    pid.last_e, resync_d = error_sign * pv, False
                 left_rpm, right_rpm, dbg = pid.compute(pv, base_rpm, error_sign,
                                                        feedforward=ff_filtered,
                                                        steer_limit=motion.steer_limit(base_rpm))

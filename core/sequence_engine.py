@@ -71,6 +71,7 @@ class SequenceEngine:
         self._actions: dict = {
             "set_speed":         self._act_set_speed,
             "set_track":         self._act_set_track,
+            "sensor_hold":       self._act_sensor_hold,
             "wait_marker":       self._act_wait_marker,
             "stop_agv":          self._act_stop_agv,
             "resume":            self._act_resume,
@@ -354,7 +355,15 @@ class SequenceEngine:
             logger.warning("[SEQ] set_track: invalid side %r — ignored", p.get("side"))
             return
         self._state.track_follow = side
+        self._state.track_set_seq += 1          # starts a fork area (core/track_select.py)
         logger.info("[SEQ] Track follow → %s", side.upper())
+
+    async def _act_sensor_hold(self, p: dict):
+        # Floor spot that shifts the tape reading: cross the next distance_m
+        # without the sensor, steering held as it was (auto_mode).
+        dist = float(p.get("distance_m", 0.3))
+        self._state.sensor_hold_request = dist
+        logger.info("[SEQ] Sensor hold → %.2f m", dist)
 
     async def _act_wait_marker(self, p: dict):
         side     = p["side"]

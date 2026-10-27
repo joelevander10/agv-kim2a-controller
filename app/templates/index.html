@@ -877,8 +877,16 @@ function fetchState() {
       // Fork track selection — highlight when RIGHT (non-default)
       const trackEl = document.getElementById('track-follow-display');
       const track   = agv.track_follow || '—';
-      trackEl.textContent = track.toUpperCase();
-      trackEl.style.color = track === 'right' ? '#a05000' : '#000080';
+      // + fork area / floor spot being ignored / sensor hold (core/track_select.py)
+      const tn = agv.track_noise || {};
+      let trackTxt = track.toUpperCase();
+      if (agv.sensor_hold_active)  trackTxt += ' · SENSOR HOLD';
+      else if (tn.locked)          trackTxt += ' · SPOT IGNORED';
+      else if (tn.fork)            trackTxt += ' · FORK';
+      if (tn.events)               trackTxt += ' (spots ' + tn.events + ')';
+      trackEl.textContent = trackTxt;
+      trackEl.style.color = (agv.sensor_hold_active || tn.locked) ? '#a00000'
+                          : track === 'right' ? '#a05000' : '#000080';
 
       // Operator-selected fork destination (HMI at homepost)
       const forkTargetEl = document.getElementById('fork-target-display');

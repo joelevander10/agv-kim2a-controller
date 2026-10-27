@@ -52,6 +52,16 @@ class KinematicState:
         self.rotate_request    = None
         self.rotate_status     = {"phase": "idle", "message": "", "angle": 0}
         self.keypad_devices    = []
+        # Track selection / floor disturbances (core/track_select.py):
+        #   track_set_seq        +1 on every set_track action or K / L key —
+        #                        starts a fork area (follow the chosen side)
+        #   track_noise          selector status for the HMI
+        #   sensor_hold_request  metres to cross without the sensor (RFID
+        #                        "sensor_hold"), consumed by auto_mode
+        self.track_set_seq       = 0
+        self.track_noise         = {"locked": False, "events": 0, "last": None, "fork": False}
+        self.sensor_hold_request = None
+        self.sensor_hold_active  = False
 
 
 class PerceptionState:
@@ -292,6 +302,26 @@ class AMRState:
     def keypad_devices(self): return self.kinematic.keypad_devices
     @keypad_devices.setter
     def keypad_devices(self, v): self.kinematic.keypad_devices = v
+
+    @property
+    def track_set_seq(self): return self.kinematic.track_set_seq
+    @track_set_seq.setter
+    def track_set_seq(self, v): self.kinematic.track_set_seq = v
+
+    @property
+    def track_noise(self): return self.kinematic.track_noise
+    @track_noise.setter
+    def track_noise(self, v): self.kinematic.track_noise = v
+
+    @property
+    def sensor_hold_request(self): return self.kinematic.sensor_hold_request
+    @sensor_hold_request.setter
+    def sensor_hold_request(self, v): self.kinematic.sensor_hold_request = v
+
+    @property
+    def sensor_hold_active(self): return self.kinematic.sensor_hold_active
+    @sensor_hold_active.setter
+    def sensor_hold_active(self, v): self.kinematic.sensor_hold_active = v
 
     # ── PerceptionState shims ─────────────────────────────────────────────────
 
