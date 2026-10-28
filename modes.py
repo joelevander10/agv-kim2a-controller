@@ -251,6 +251,10 @@ async def auto_mode(state, engine=None):
                         await engine.on_marker("left")
                     if sensor["right_marker"]:
                         await engine.on_marker("right")
+                    # Left AND right marker at the same time = its own trigger
+                    # ("marker_side": "both", e.g. marker_both_medium).
+                    if sensor["left_marker"] and sensor["right_marker"]:
+                        await engine.on_marker("both")
 
                 # ── Acceleration / deceleration ramp ──────────────────────────
                 # Real time between sensor frames (~10 Hz), so the rates are true

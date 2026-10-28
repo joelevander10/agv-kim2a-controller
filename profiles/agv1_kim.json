@@ -518,6 +518,18 @@
       "requires_mode": "running"
     },
     {
+      "_comment": "Add-on to the RFID tags: MGS1600 LEFT and RIGHT marker seen AT THE SAME TIME (opposite-polarity tape on both sides of the track) -> HIGH to MEDIUM. Only acts when the AGV is at HIGH (requires_speed); at any other speed, and with one marker alone, nothing happens. Fires once per marker pair (cooldown 3 s; the sensor reports markers every frame while they are under it). Not while a trolley-station approach is armed.",
+      "name": "marker_both_medium",
+      "category": "navigation",
+      "trigger": { "type": "marker", "marker_side": "both" },
+      "actions": [
+        { "type": "set_speed", "speed": "MEDIUM" }
+      ],
+      "cooldown_s": 3.0,
+      "requires_mode": "running",
+      "requires_speed": ["HIGH"]
+    },
+    {
       "_comment": "HOMEPOST (tag 0000): brake and end AUTO there (back to ARMED, run log saved); START / G starts the next trip. Ignored for the first 5 s after START (the AGV may start on this tag). Put a SLOW tag (e.g. 0014) before it so it arrives slowly.",
       "name": "homepost_stop",
       "category": "sequence",

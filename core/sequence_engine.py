@@ -175,7 +175,12 @@ class SequenceEngine:
                 # skip set_speed + wait_marker steps (already done during approach)
                 self._active_task = asyncio.create_task(self._run_sequence(seq, skip_approach=True))
 
-        # Check pure marker-triggered sequences
+        # Check pure marker-triggered sequences. auto_mode calls this on every
+        # sensor frame while the marker is under the sensor, so these rely on
+        # their cooldown_s to fire once per marker. Not while a station
+        # approach is armed (it must keep its APPROACH crawl).
+        if self._state.pending_sequence:
+            return
         for seq in self._sequences:
             trig = seq["trigger"]
             if trig["type"] == "marker" and trig.get("marker_side") == side:
@@ -260,6 +265,17 @@ class SequenceEngine:
             logger.debug("[SEQ] '%s' ignored — mode is '%s', need '%s'",
                          seq["name"], self._state.current_mode, required_mode)
             return False
+
+        # Optional "requires_speed": only fire in these speed modes (e.g. the
+        # marker pair that slows HIGH -> MEDIUM is ignored at other speeds).
+        req_speed = seq.get("requires_speed")
+        if req_speed:
+            if isinstance(req_speed, str):
+                req_speed = [req_speed]
+            if self._state.speed_mode not in req_speed:
+                logger.debug("[SEQ] '%s' ignored — speed is %s, need %s",
+                             seq["name"], self._state.speed_mode, "/".join(req_speed))
+                return False
 
         cooldown_exp = self._cooldowns.get(seq["name"], 0.0)
         if now < cooldown_exp:

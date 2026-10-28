@@ -1,18 +1,139 @@
+"""
+rfid_tcp.py — RFID reader over TCP (RFID_IP:RFID_PORT)
+=======================================================
+Frame parser ported from the AGV Kayaba driver (2026-10-28). The old parser
+split the hex text on "CF": a read split across two TCP packets was dropped,
+and a 0xCF byte inside a read (RSSI, CRC, or a tag like 00CF) broke it. At slow
+speed the reader sends many reads per tag so that did not matter; at 0.8 m/s a
+tag may only be read once or twice, so one lost read = a missed tag.
+
+Each tag pass is also counted: the log line "RFID 0015 passed: N reads in
+T s" shows how much margin there is (1 read = close to missing it).
+"""
 import asyncio
 import binascii
 import logging
 import socket
+import time
 
 import config
 from drivers.base import SensorDriver
 
 logger = logging.getLogger(__name__)
 
+# ── Reader frame format ──────────────────────────────────────────────────────
+#   [0] 0xCF  [1] addr  [2..3] cmd  [4] LEN  [5 .. 5+LEN-1] data  [last 2] CRC
+#   CRC = CRC-16/MCRF4XX over every byte before it, sent high byte first
+#   (checked against the init command CF FF 00 70 00 -> 24 15).
+# The tag ID is bytes 13..14 of a tag frame (same position as before).
+_HEADER     = 0xCF
+_MIN_FRAME  = 7          # header+addr+cmd(2)+len+crc(2), no data
+_TAG_FRAME  = 17         # shortest frame that carries a tag
+_MAX_BUFFER = 4096
+
+
+def _crc16(data: bytes) -> int:
+    crc = 0xFFFF
+    for b in data:
+        crc ^= b
+        for _ in range(8):
+            crc = (crc >> 1) ^ 0x8408 if crc & 1 else crc >> 1
+    return crc
+
+
+def _frame_at(buf: bytearray, i: int):
+    """Length of a complete, CRC-valid frame starting at buf[i], 0 if the
+    frame is not complete yet, -1 if buf[i] is not a real frame start."""
+    if len(buf) - i < 5:
+        return 0
+    total = _MIN_FRAME + buf[i + 4]
+    if len(buf) - i < total:
+        return 0
+    frame = buf[i:i + total]
+    if _crc16(frame[:-2]) == (frame[-2] << 8 | frame[-1]):
+        return total
+    return -1
+
+
+def parse_frames(buf: bytearray) -> list:
+    """Pull every complete frame out of buf (bytes stay in buf until a whole
+    frame has arrived, so frames split across TCP reads are not lost, and a
+    0xCF byte inside the data is never mistaken for a new frame)."""
+    frames = []
+    while True:
+        i = buf.find(_HEADER)
+        if i < 0:
+            buf.clear()
+            break
+        if i:
+            del buf[:i]
+        n = _frame_at(buf, 0)
+        if n > 0:
+            frames.append(bytes(buf[:n]))
+            del buf[:n]
+            continue
+        if n < 0:                      # false header — resync on the next 0xCF
+            del buf[:1]
+            continue
+        # Incomplete at 0: if a valid frame already sits further on, the
+        # byte at 0 was a false header (with a bogus length) — skip to it.
+        j = buf.find(_HEADER, 1)
+        skipped = False
+        while j > 0:
+            if _frame_at(buf, j) > 0:
+                del buf[:j]
+                skipped = True
+                break
+            j = buf.find(_HEADER, j + 1)
+        if not skipped:
+            if len(buf) > _MAX_BUFFER:
+                buf.clear()
+            break
+    return frames
+
+
+_CMD_TAG = 0x0001        # inventory report: CF addr 00 01 LEN status RSSI(2) ant ch EPClen EPC CRC
+
+
+def tag_from_frame(frame: bytes):
+    """Tag ID from an inventory report, None for any other frame (e.g. the
+    device-info answer to the init command, which used to show up as a
+    junk tag "3130" and cleared at_homepost on every connect)."""
+    if len(frame) < _TAG_FRAME:
+        return None
+    if (frame[2] << 8 | frame[3]) != _CMD_TAG or frame[5] != 0x00:
+        return None
+    return binascii.hexlify(frame[13:15]).decode().upper()
+
 
 class RFIDReader(SensorDriver):
 
     def __init__(self):
         super().__init__("RFID TCP")
+        self._pass = None          # [tag, reads, first_t, last_t] of the tag in range
+
+    # ── Reads per tag pass (diagnostic) ──────────────────────────────────────
+    PASS_GAP_S = 1.0               # no read of the tag for this long = pass over
+
+    def _count_pass(self, tag, now):
+        p = self._pass
+        if p and p[0] == tag and now - p[3] < self.PASS_GAP_S:
+            p[1] += 1
+            p[3] = now
+            return
+        self._flush_pass()
+        self._pass = [tag, 1, now, now]
+
+    def _flush_pass(self):
+        p, self._pass = self._pass, None
+        if not p:
+            return
+        tag, reads, t0, t1 = p
+        if reads <= 1:
+            logger.warning("RFID %s passed: only 1 read — close to missing it "
+                           "(slow down before this tag, or add a second tag)", tag)
+        else:
+            logger.info("RFID %s passed: %d reads in %.2f s", tag, reads, t1 - t0)
 
     async def run(self, state):
         loop = asyncio.get_running_loop()
@@ -20,6 +141,8 @@ class RFIDReader(SensorDriver):
         while True:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setblocking(False)
+            buf = bytearray()
+            last_tag, last_log_t = None, 0.0
             try:
                 await loop.sock_connect(sock, (config.RFID_IP, config.RFID_PORT))
                 await loop.sock_sendall(sock, config.RFID_INIT_CMD)
@@ -33,21 +156,29 @@ class RFIDReader(SensorDriver):
                             timeout=2.0)
                     except asyncio.TimeoutError:
                         # No tag in range — connection still alive, keep watchdog happy
+                        buf.clear()
                         self._record_rx()
+                        self._flush_pass()
                         continue
 
                     if not data:
                         logger.warning("RFID connection closed by peer.")
                         break
 
-                    hex_data = binascii.hexlify(data).decode().upper()
-                    for packet in hex_data.split("CF")[1:]:
-                        packet = "CF" + packet
-                        if len(packet) >= 34:
-                            tag = packet[26:30]
+                    buf.extend(data)
+                    for frame in parse_frames(buf):
+                        tag = tag_from_frame(frame)
+                        if tag is None:
+                            continue
+                        state.rfid_queue.put_nowait(tag)
+                        self._record_rx()
+                        # Log a tag once while it stays in range (not every read).
+                        now = time.monotonic()
+                        if tag != last_tag or now - last_log_t > 2.0:
                             logger.info("RFID tag read: %s (dec=%d)", tag, int(tag, 16))
-                            await state.rfid_queue.put(tag)
-                            self._record_rx()
+                            last_log_t = now
+                        last_tag = tag
+                        self._count_pass(tag, now)
 
             except Exception as e:
                 logger.warning("RFID connection failed/lost: %s. Retrying in 2s...", e)
