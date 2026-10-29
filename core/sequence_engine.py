@@ -30,6 +30,10 @@ class SequenceTimeout(Exception):
     pass
 
 
+class SequencePositionFault(Exception):
+    """AGV not in position at a station — the conveyor must not start."""
+
+
 class SequencePLCFault(Exception):
     """Raised when a PLC handshake never completes within its done_timeout.
     Unlike SequenceTimeout, this holds the AGV stopped (fault) until the
@@ -80,6 +84,7 @@ class SequenceEngine:
             "resume":            self._act_resume,
             "sequence_stop":     self._act_sequence_stop,
             "wait_seconds":      self._act_wait_seconds,
+            "wait_in_position":  self._act_wait_in_position,
             "plc_request":       self._act_plc_request,
             "wait_plc_complete": self._act_wait_plc_complete,
         }
@@ -332,6 +337,15 @@ class SequenceEngine:
             self._state.speed_mode    = "HIGH"
             self._record_event(name, "timeout", f"timed out ({exc}) — resumed HIGH")
 
+        except SequencePositionFault as exc:
+            # Same as a PLC fault: hold the AGV stopped, the PLC is NOT asked
+            # to run the conveyor. Operator fixes the position / trolley and
+            # presses RESET.
+            logger.error("[SEQ] '%s' NOT IN POSITION (%s) — conveyor not started, "
+                         "holding, operator RESET required", name, exc)
+            self._state.sequence_stop = True
+            self._record_event(name, "fault", f"not in position ({exc}) — conveyor NOT started, RESET required")
+
         except SequencePLCFault as exc:
             # Hold the AGV stopped (fault). Do NOT clear sequence_stop — the
             # operator must press RESET, which returns to ARMED and clears it.
@@ -458,11 +472,51 @@ class SequenceEngine:
     async def _act_wait_seconds(self, p: dict):
         await asyncio.sleep(p["duration"])
 
+    async def _act_wait_in_position(self, p: dict):
+        """Station interlock before the PLC conveyor request: the AGV must be
+        stopped ON the tape — |tape error| <= tolerance_mm, steady for
+        settle_s — and, with "require_prox": true, still on the station marker
+        (DI_PROX on). Not within timeout -> SequencePositionFault: the
+        conveyor is NOT started and the AGV holds until RESET. The measured
+        error is logged at every station so the tolerance can be set."""
+        tol     = float(p.get("tolerance_mm", 15.0))
+        settle  = float(p.get("settle_s", 0.5))
+        timeout = float(p.get("timeout", 5.0))
+        need_prox = bool(p.get("require_prox", False))
+        deadline = time.time() + timeout
+        ok_since, last = None, "no sensor data"
+        while time.time() < deadline:
+            if self._state.current_mode != "running":
+                raise asyncio.CancelledError()
+            sen = self._state.latest_sensor or {}
+            pv = sen.get("right_mm") if self._state.track_follow == "right" else sen.get("left_mm")
+            di = self._state.latest_di
+            prox = bool(config.DI_PROX >= 0 and di and len(di) > config.DI_PROX and di[config.DI_PROX])
+            if not sen.get("tape_detected", False) or pv is None:
+                ok, last = False, "tape not detected"
+            elif abs(pv) > tol:
+                ok, last = False, f"tape error {-pv:+.0f} mm (limit ±{tol:.0f})"
+            elif need_prox and not prox:
+                ok, last = False, "station marker (prox) not under the AGV — overshoot?"
+            else:
+                ok, last = True, f"tape error {-pv:+.0f} mm" + (", prox on" if need_prox else "")
+            if ok:
+                ok_since = ok_since or time.time()
+                if time.time() - ok_since >= settle:
+                    logger.info("[SEQ] In position (%s) — starting conveyor", last)
+                    return
+            else:
+                ok_since = None
+            await asyncio.sleep(0.05)
+        raise SequencePositionFault(last)
+
     async def _act_plc_request(self, p: dict):
         seq_num      = p["seq_num"]
         pulse        = p.get("pulse_duration", 1.0)
         self._state.plc_sequence_request      = seq_num
         self._state.plc_sequence_pulse_expire = time.time() + pulse
+        self._state.plc.last_request = {"seq": seq_num, "t": time.time(),
+                                        "source": f"station sequence '{self._active_sequence}'"}
         logger.info("[SEQ] PLC request seq=%d (pulse %.1fs)", seq_num, pulse)
 
     async def _act_wait_plc_complete(self, p: dict):

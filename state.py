@@ -100,6 +100,9 @@ class PLCState:
         self.plc_sequence_request      = None   # int 0-16 → sets M201x; None → all LOW
         self.plc_sequence_pulse_expire = 0.0    # epoch after which request bit is cleared
         self.plc_sequence_complete     = [False] * 17  # M2040–M2056
+        # Who asked the PLC for a sequence last: {"seq", "source", "t"} —
+        # logged when the PLC starts a conveyor (drivers/slmp_plc.py).
+        self.last_request              = None
 
 
 class TrolleyState:

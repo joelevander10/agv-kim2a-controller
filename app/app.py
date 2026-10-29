@@ -268,6 +268,9 @@ def api_state():
     return jsonify(_build_state_snapshot())
 
 
+MANUAL_SEQ_ENABLED = False
+
+
 @app.route("/api/sequence", methods=["POST"])
 def api_sequence():
     """Manual PLC sequence request (M2010-M2018).
@@ -303,6 +306,23 @@ def api_sequence():
     #     return jsonify({"error": "SET requires PLC MANUAL MODE (M1)"}), 403
     if not isinstance(seq, int) or not (0 <= seq < _NUM_SEQ_BITS):
         return jsonify({"error": f"sequence must be int 0–{_NUM_SEQ_BITS - 1} or null"}), 400
+
+    # Manual sequence requests are switched off (2026-10-29, the HOME page
+    # panel was removed): they made the PLC run the trolley wherever the AGV
+    # was. Only the station sequences request PLC sequences. CLEAR (None,
+    # above) still works. Set MANUAL_SEQ_ENABLED = True to allow it again
+    # (then only when the AGV is not driving).
+    if not MANUAL_SEQ_ENABLED:
+        logger.warning("[HMI] Manual PLC SEQ %d refused — manual sequence requests are off", seq)
+        return jsonify({"error": "manual sequence requests are disabled — "
+                                 "use Pilih Cabang / F1–F11 to choose a branch"}), 403
+    if _state.current_mode == "running" and not _state.sequence_stop:
+        logger.warning("[HMI] Manual PLC SEQ %d refused — AGV is driving in AUTO", seq)
+        return jsonify({"error": "AGV is driving — a manual SEQ would move the trolley now. "
+                                 "To choose a branch use Pilih Cabang (or F1–F11)."}), 409
+    logger.warning("[HMI] Manual PLC SEQ %d sent from the HOME page (AGV %s)",
+                   seq, _state.current_mode)
+    _state.plc.last_request = {"seq": seq, "t": time.time(), "source": "HOME page SEQ (manual)"}
 
     _state.plc_sequence_request      = seq
     _state.plc_sequence_pulse_expire = time.time() + 1.0   # 1-second pulse

@@ -647,21 +647,9 @@
 
 </div>
 
-<!-- Sequence control panel -->
-<div id="ctrl" class="raised">
-  <span class="ctrl-label">Sequence Request:</span>
-  <select id="seq-select">
-    <option value="null">— NONE —</option>
-  </select>
-  <button id="btn-set">SET</button>
-  <button id="btn-clear">CLEAR</button>
-  <span id="ctrl-status"></span>
-  <div id="ctrl-conditions">
-    <div class="cond-item"><span class="lamp" id="cond-master"></span>M4 MASTER ON</div>
-    <div class="cond-item"><span class="lamp" id="cond-manual"></span>M1 MANUAL MODE</div>
-    <div class="cond-item"><span class="lamp" id="cond-pulse"></span>PULSE ACTIVE</div>
-  </div>
-</div>
+<!-- Manual "Sequence Request" panel removed 2026-10-29: a manual SEQ made
+     the PLC run the trolley wherever the AGV was. PLC sequences are only
+     requested by the station sequences now (tag + prox + in-position). -->
 
 <!-- Fork target selection panel -->
 <div id="fork-target-panel" class="raised">
@@ -718,14 +706,9 @@
 const N_SEQ = 9;
 
 (function init() {
-  const sel      = document.getElementById('seq-select');
   const reqGrid  = document.getElementById('seq-req-grid');
   const doneGrid = document.getElementById('seq-done-grid');
   for (let i = 0; i < N_SEQ; i++) {
-    const opt = document.createElement('option');
-    opt.value = i; opt.textContent = `SEQ ${i}`;
-    sel.appendChild(opt);
-
     const rc = document.createElement('div');
     rc.className = 'seq-cell';
     rc.innerHTML = `<span class="lamp" id="w-seq${i}"></span>`
@@ -800,18 +783,6 @@ function fetchState() {
       for (let i = 0; i < N_SEQ; i++) {
         setLamp(document.getElementById(`r-seq${i}`), r[`M${2040+i}_SEQ${i}_COMPLETE`], 'on-amber');
       }
-
-      // Condition indicators
-      const masterOn   = r.M4_MASTER_ON;
-      const manualOn   = r.M1_MODE_MAN;
-      const pulseActive = agv.seq_pulse_active;
-      setLamp(document.getElementById('cond-master'), masterOn,   'on-green');
-      setLamp(document.getElementById('cond-manual'), manualOn,   'on-blue');
-      setLamp(document.getElementById('cond-pulse'),  pulseActive, 'on-amber');
-
-      // Disable SET while pulse is active
-      document.getElementById('btn-set').disabled = pulseActive;
-      document.getElementById('btn-set').style.opacity = pulseActive ? '0.4' : '1';
 
       // Sensor panel
       const sen = d.sensor;
@@ -907,27 +878,6 @@ function fetchState() {
     });
 }
 
-document.getElementById('btn-set').addEventListener('click', () => {
-  const val  = document.getElementById('seq-select').value;
-  const body = val === 'null' ? { sequence: null } : { sequence: parseInt(val) };
-  fetch('/api/sequence', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
-  .then(r => r.json())
-  .then(d => {
-    const st = document.getElementById('ctrl-status');
-    st.style.color = d.ok ? '#006000' : '#c00000';
-    st.textContent  = d.ok
-      ? (d.sequence !== null
-          ? `SET → SEQ ${d.sequence}` + (d.fork_target ? ` (CABANG ${d.sequence + 1})` : '')
-          : 'CLEARED')
-      : (d.error || 'ERROR');
-    setTimeout(() => { st.textContent = ''; }, 4000);
-  });
-});
-
 document.getElementById('btn-fork-set').addEventListener('click', () => {
   const val    = document.getElementById('fork-target-select').value;
   const target = val === 'null' ? null : val;
@@ -943,22 +893,6 @@ document.getElementById('btn-fork-set').addEventListener('click', () => {
     st.textContent  = d.ok
       ? (d.target ? `SET → CABANG ${d.target.replace('point_', '')}` : 'DIBATALKAN')
       : (d.error || 'ERROR');
-    setTimeout(() => { st.textContent = ''; }, 4000);
-  });
-});
-
-document.getElementById('btn-clear').addEventListener('click', () => {
-  document.getElementById('seq-select').value = 'null';
-  fetch('/api/sequence', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sequence: null })
-  })
-  .then(r => r.json())
-  .then(d => {
-    const st = document.getElementById('ctrl-status');
-    st.style.color  = d.ok ? '#006000' : '#c00000';
-    st.textContent  = d.ok ? 'CLEARED' : (d.error || 'ERROR');
     setTimeout(() => { st.textContent = ''; }, 4000);
   });
 });

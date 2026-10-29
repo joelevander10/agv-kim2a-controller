@@ -566,13 +566,14 @@
         "approach_speed": "APPROACH"
       },
       "actions": [
-        { "type": "set_speed",        "speed": "APPROACH" },
-        { "type": "wait_marker",      "side": "prox", "timeout": 45.0 },
-        { "type": "stop_agv" },
-        { "type": "wait_seconds",     "duration": 1.0 },
-        { "type": "plc_request",      "seq_num": 0, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 0, "clear_timeout": 10.0 },
-        { "type": "resume",           "speed": "SLOW" }
+        {"type": "set_speed", "speed": "APPROACH"},
+        {"type": "wait_marker", "side": "prox", "timeout": 45.0},
+        {"type": "stop_agv"},
+        {"type": "wait_seconds", "duration": 1.0},
+        {"type": "wait_in_position", "tolerance_mm": 15, "settle_s": 0.5, "timeout": 5.0, "require_prox": false},
+        {"type": "plc_request", "seq_num": 0, "pulse_duration": 1.0},
+        {"type": "wait_plc_complete", "seq_num": 0, "clear_timeout": 10.0},
+        {"type": "resume", "speed": "SLOW"}
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
@@ -587,14 +588,15 @@
         "approach_timeout": 30.0
       },
       "actions": [
-        { "type": "set_speed",        "speed": "APPROACH" },
-        { "type": "wait_marker",      "side": "prox", "timeout": 30.0 },
-        { "type": "stop_agv" },
-        { "type": "wait_seconds",     "duration": 1.0 },
-        { "type": "plc_request",      "seq_num": 1, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 1, "clear_timeout": 5.0, "done_timeout": 60.0 },
-        { "type": "wait_seconds",     "duration": 1.0 },
-        { "type": "resume",           "speed": "SLOW" }
+        {"type": "set_speed", "speed": "APPROACH"},
+        {"type": "wait_marker", "side": "prox", "timeout": 30.0},
+        {"type": "stop_agv"},
+        {"type": "wait_seconds", "duration": 1.0},
+        {"type": "wait_in_position", "tolerance_mm": 15, "settle_s": 0.5, "timeout": 5.0, "require_prox": false},
+        {"type": "plc_request", "seq_num": 1, "pulse_duration": 1.0},
+        {"type": "wait_plc_complete", "seq_num": 1, "clear_timeout": 5.0, "done_timeout": 60.0},
+        {"type": "wait_seconds", "duration": 1.0},
+        {"type": "resume", "speed": "SLOW"}
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"
@@ -609,12 +611,13 @@
         "approach_timeout": 15.0
       },
       "actions": [
-        { "type": "set_speed",        "speed": "SLOW" },
-        { "type": "wait_marker",      "side": "prox", "timeout": 30.0 },
-        { "type": "stop_agv" },
-        { "type": "plc_request",      "seq_num": 2, "pulse_duration": 1.0 },
-        { "type": "wait_plc_complete","seq_num": 2, "clear_timeout": 5.0, "done_timeout": 30.0 },
-        { "type": "resume",           "speed": "SLOW" }
+        {"type": "set_speed", "speed": "SLOW"},
+        {"type": "wait_marker", "side": "prox", "timeout": 30.0},
+        {"type": "stop_agv"},
+        {"type": "wait_in_position", "tolerance_mm": 15, "settle_s": 0.5, "timeout": 5.0, "require_prox": false},
+        {"type": "plc_request", "seq_num": 2, "pulse_duration": 1.0},
+        {"type": "wait_plc_complete", "seq_num": 2, "clear_timeout": 5.0, "done_timeout": 30.0},
+        {"type": "resume", "speed": "SLOW"}
       ],
       "cooldown_s": 10.0,
       "requires_mode": "running"

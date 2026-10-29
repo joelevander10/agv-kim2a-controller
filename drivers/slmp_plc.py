@@ -85,6 +85,35 @@ def _plc_sync_cycle(plc, state) -> None:
         plc.batchread_bitunits(headdevice="X0", readsize=12)]
 
 
+# PLC outputs that move the trolley (Y index -> name), see the TROLLEY page.
+_CONVEYOR_Y = {0: "top conveyor FWD", 1: "top conveyor RVS",
+               4: "bottom conveyor FWD", 5: "bottom conveyor RVS"}
+
+
+def _log_conveyor_starts(state, prev_y):
+    """Log every time the PLC switches a conveyor on, with what the AGV was
+    doing and who last asked the PLC for a sequence — so a trolley that moves
+    at the wrong time can be traced (AGV station sequence, HOME page SEQ,
+    keypad / TROLLEY page in MANUAL, or the PLC on its own)."""
+    y = list(state.trolley.y_bits)
+    if prev_y is not None:
+        for idx, name in _CONVEYOR_Y.items():
+            if idx < len(y) and y[idx] and not prev_y[idx]:
+                lr = state.plc.last_request
+                if lr and time.time() - lr["t"] < 120:
+                    who = f"last AGV request: SEQ {lr['seq']} from {lr['source']} {time.time() - lr['t']:.0f} s ago"
+                else:
+                    who = "NO AGV request in the last 2 min — started by the PLC itself"
+                manual = [k for k, v in state.trolley.write_bits.items() if v]
+                if manual:
+                    who += f"; manual trolley bits on: {', '.join(sorted(manual))}"
+                logger.warning("[PLC] %s started — AGV %s%s, tag %s; %s", name,
+                               state.current_mode,
+                               " (stopped)" if state.sequence_stop else "",
+                               state.latest_rfid_tag, who)
+    return y
+
+
 class SLMPDriver(ActuatorDriver):
 
     async def run(self, state) -> None:
@@ -100,8 +129,10 @@ class SLMPDriver(ActuatorDriver):
                 )
                 logger.info("[SLMP] Connected to PLC at %s:%s", config.SLMP_IP, config.SLMP_PORT)
 
+                prev_y = None
                 while True:
                     await loop.run_in_executor(None, _plc_sync_cycle, plc, state)
+                    prev_y = _log_conveyor_starts(state, prev_y)
                     await asyncio.sleep(0.02)
 
             except Exception as e:
