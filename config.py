@@ -71,6 +71,10 @@ DI_START       = _params["io_mapping"]["DI_START"]
 DI_RESET       = _params["io_mapping"]["DI_RESET"]
 # Magnetic proximity sensor used as a station marker for sequences (-1 = none).
 DI_PROX        = _params["io_mapping"].get("DI_PROX", -1)
+# Horn output (-1 = none). HORN_MODE "running": on the whole time AUTO is
+# RUNNING; "moving": only while it is actually driving.
+DO_HORN        = _params["io_mapping"].get("DO_HORN", -1)
+HORN_MODE      = str(_params["io_mapping"].get("HORN_MODE", "running")).lower()
 
 # ── Motor Channels (parameterized — avoids hardcoded DO 0-5 in motion.py) ────
 # Falls back to the hardcoded mapping if the profile doesn't have this section
