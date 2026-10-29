@@ -536,12 +536,24 @@
       "requires_speed": ["HIGH"]
     },
     {
-      "_comment": "Add-on to the RFID tags: MGS1600 LEFT marker alone (right marker off) seen without a break for 2 s (hold_s) -> MEDIUM to HIGH. Only acts at MEDIUM (requires_speed). At 0.5 m/s, 2 s = 1.0 m, so the left marker tape must be longer than ~1.2 m. Once per marker (cooldown 3 s). Not while a trolley-station approach is armed.",
+      "_comment": "Add-on to the RFID tags: MGS1600 LEFT marker alone (right marker off) seen without a break for hold_s (0.5 s) -> MEDIUM to HIGH. Only acts at MEDIUM (requires_speed). At 0.5 m/s, 0.5 s = 0.25 m, so lay the left marker longer than ~0.4 m. Once per marker (cooldown 3 s). Not while a trolley-station approach is armed.",
       "name": "marker_left_high",
       "category": "navigation",
       "trigger": { "type": "marker", "marker_side": "left_only", "hold_s": 0.5 },
       "actions": [
         { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 3.0,
+      "requires_mode": "running",
+      "requires_speed": ["MEDIUM"]
+    },
+    {
+      "_comment": "Add-on to the RFID tags: MGS1600 RIGHT marker alone (left marker off) seen without a break for 0.5 s (hold_s) -> MEDIUM to SLOW. Only acts at MEDIUM (requires_speed). No corner feedforward (corner false). At 0.5 m/s, 0.5 s = 0.25 m, so lay the right marker longer than ~0.4 m. Once per marker (cooldown 3 s). Not while a trolley-station approach is armed.",
+      "name": "marker_right_slow",
+      "category": "navigation",
+      "trigger": { "type": "marker", "marker_side": "right_only", "hold_s": 0.5 },
+      "actions": [
+        { "type": "set_speed", "speed": "SLOW", "corner": false }
       ],
       "cooldown_s": 3.0,
       "requires_mode": "running",
