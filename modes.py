@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 #  AUTO MODE  (forward tape-following only)
 # ══════════════════════════════════════════════════════════════════════════════
 
+MARKER_GAP_S = 0.5      # a marker missing for less than this still counts as held (few lost ~10 Hz frames)
+
+
 def _mode_gains(mode):
     """(KP, TD, N, V_RED_COEF, clamp_hi, clamp_lo) of a speed mode, read live
     from config so PARAMS changes apply at once. Unknown modes run as HIGH."""
@@ -88,6 +91,7 @@ async def auto_mode(state, engine=None):
     recent_out           = collections.deque(maxlen=100)   # last ~1 s of steering output
     resync_d             = False  # first frame after a hold: no derivative kick
     blend_from           = None   # gains of the previous speed mode while the speed changes
+    marker_hold          = {}     # marker pattern -> [first seen, last seen] (monotonic s)
     blend_v0             = 0.0    # speed when the speed mode changed
     frame_t              = None   # perf_counter of the previous sensor frame
 
@@ -251,10 +255,21 @@ async def auto_mode(state, engine=None):
                         await engine.on_marker("left")
                     if sensor["right_marker"]:
                         await engine.on_marker("right")
-                    # Left AND right marker at the same time = its own trigger
-                    # ("marker_side": "both", e.g. marker_both_medium).
-                    if sensor["left_marker"] and sensor["right_marker"]:
-                        await engine.on_marker("both")
+                    # Marker patterns with how long they have been seen without
+                    # a break (gaps under MARKER_GAP_S are ignored):
+                    #   "both"       left AND right (e.g. marker_both_medium)
+                    #   "left_only"  left, right off (e.g. marker_left_high, 2 s)
+                    #   "right_only" right, left off
+                    _l, _r = bool(sensor["left_marker"]), bool(sensor["right_marker"])
+                    _pat = "both" if _l and _r else "left_only" if _l else "right_only" if _r else None
+                    if _pat is not None:
+                        _now = time.monotonic()
+                        _h = marker_hold.get(_pat)
+                        if _h is None or _now - _h[1] > MARKER_GAP_S:
+                            _h = [_now, _now]
+                        _h[1] = _now
+                        marker_hold[_pat] = _h
+                        await engine.on_marker(_pat, held_s=_now - _h[0])
 
                 # ── Acceleration / deceleration ramp ──────────────────────────
                 # Real time between sensor frames (~10 Hz), so the rates are true

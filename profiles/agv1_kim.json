@@ -536,6 +536,18 @@
       "requires_speed": ["HIGH"]
     },
     {
+      "_comment": "Add-on to the RFID tags: MGS1600 LEFT marker alone (right marker off) seen without a break for 2 s (hold_s) -> MEDIUM to HIGH. Only acts at MEDIUM (requires_speed). At 0.5 m/s, 2 s = 1.0 m, so the left marker tape must be longer than ~1.2 m. Once per marker (cooldown 3 s). Not while a trolley-station approach is armed.",
+      "name": "marker_left_high",
+      "category": "navigation",
+      "trigger": { "type": "marker", "marker_side": "left_only", "hold_s": 2.0 },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 3.0,
+      "requires_mode": "running",
+      "requires_speed": ["MEDIUM"]
+    },
+    {
       "_comment": "HOMEPOST (tag 0000): brake and end AUTO there (back to ARMED, run log saved); START / G starts the next trip. Ignored for the first 5 s after START (the AGV may start on this tag). Put a SLOW tag (e.g. 0014) before it so it arrives slowly.",
       "name": "homepost_stop",
       "category": "sequence",

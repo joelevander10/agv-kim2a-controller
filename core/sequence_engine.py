@@ -162,7 +162,7 @@ class SequenceEngine:
                     asyncio.create_task(
                         self._approach_timeout_watch(seq["name"], approach_timeout))
 
-    async def on_marker(self, side: str):
+    async def on_marker(self, side: str, held_s: float = 0.0):
         """Called by auto_mode whenever a left/right marker is detected in the
         sensor frame.  Fires both armed rfid_then_marker sequences and pure
         marker-triggered sequences."""
@@ -188,7 +188,10 @@ class SequenceEngine:
             return
         for seq in self._sequences:
             trig = seq["trigger"]
-            if trig["type"] == "marker" and trig.get("marker_side") == side:
+            # "hold_s": the marker pattern must have been seen without a break
+            # this long (auto_mode measures held_s), e.g. 2 s for left -> HIGH.
+            if (trig["type"] == "marker" and trig.get("marker_side") == side
+                    and held_s >= float(trig.get("hold_s", 0.0))):
                 if not self._category_enabled(seq):
                     continue
                 if not self._check_preconditions(seq, now):
