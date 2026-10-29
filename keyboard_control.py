@@ -165,7 +165,7 @@ def handle_key(state, key, source="keyboard"):
         # Not mode-gated (chosen at the homepost before START).
         target = BRANCH_KEYS.get(key)
         state.selected_fork_target = target
-        label = f"CABANG {target.split('_')[1]}" if target else "no CABANG"
+        label = config.cabang_label(target) if target else "no CABANG"
         logger.info("[%s] %s — %s selected", source, key.upper(), label)
         return True, label
 

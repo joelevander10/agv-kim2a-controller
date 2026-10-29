@@ -656,17 +656,9 @@
   <span class="ctrl-label">Pilih Cabang:</span>
   <select id="fork-target-select">
     <option value="null">— BELUM DIPILIH —</option>
-    <option value="point_1">CABANG 1</option>
-    <option value="point_2">CABANG 2</option>
-    <option value="point_3">CABANG 3</option>
-    <option value="point_4">CABANG 4</option>
-    <option value="point_5">CABANG 5</option>
-    <option value="point_6">CABANG 6</option>
-    <option value="point_7">CABANG 7</option>
-    <option value="point_8">CABANG 8</option>
-    <option value="point_9">CABANG 9</option>
-    <option value="point_10">CABANG 10</option>
-    <option value="point_11">CABANG 11</option>
+    {% for key, name in cabang_names.items() %}
+    <option value="{{ key }}">{{ name }}{% if not name.startswith('CABANG') %} (CABANG {{ key[6:] }}){% endif %}</option>
+    {% endfor %}
   </select>
   <button id="btn-fork-set">SET</button>
   <span id="fork-target-status"></span>
@@ -704,6 +696,7 @@
 
 <script>
 const N_SEQ = 9;
+const CABANG_NAMES = {{ cabang_names|tojson }};   // from profile "cabang_names"
 
 (function init() {
   const reqGrid  = document.getElementById('seq-req-grid');
@@ -868,7 +861,7 @@ function fetchState() {
       // Operator-selected fork destination (HMI at homepost)
       const forkTargetEl = document.getElementById('fork-target-display');
       const forkTarget = agv.selected_fork_target;
-      const forkLabel  = forkTarget ? 'CABANG ' + forkTarget.replace('point_', '') : '—';
+      const forkLabel  = forkTarget ? (CABANG_NAMES[forkTarget] || 'CABANG ' + forkTarget.replace('point_', '')) : '—';
       forkTargetEl.textContent = forkLabel;
 
       document.getElementById('ts').textContent = new Date().toLocaleTimeString();
@@ -891,7 +884,7 @@ document.getElementById('btn-fork-set').addEventListener('click', () => {
     const st = document.getElementById('fork-target-status');
     st.style.color = d.ok ? '#006000' : '#c00000';
     st.textContent  = d.ok
-      ? (d.target ? `SET → CABANG ${d.target.replace('point_', '')}` : 'DIBATALKAN')
+      ? (d.target ? `SET → ${CABANG_NAMES[d.target] || 'CABANG ' + d.target.replace('point_', '')}` : 'DIBATALKAN')
       : (d.error || 'ERROR');
     setTimeout(() => { st.textContent = ''; }, 4000);
   });

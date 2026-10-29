@@ -177,7 +177,8 @@ _VALID_COMMANDS = {"forward", "fwd_left", "fwd_right", "reverse",
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    import config
+    return render_template("index.html", cabang_names=config.CABANG_NAMES)
 
 @app.route("/manual")
 def manual():

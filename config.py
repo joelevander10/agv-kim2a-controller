@@ -71,6 +71,18 @@ DI_START       = _params["io_mapping"]["DI_START"]
 DI_RESET       = _params["io_mapping"]["DI_RESET"]
 # Magnetic proximity sensor used as a station marker for sequences (-1 = none).
 DI_PROX        = _params["io_mapping"].get("DI_PROX", -1)
+# Branch (CABANG) display names: point_n -> name; missing -> "CABANG n".
+_cn = _params.get("cabang_names", {}) or {}
+CABANG_NAMES = {f"point_{i}": str(_cn.get(f"point_{i}") or f"CABANG {i}") for i in range(1, 12)}
+
+
+def cabang_label(target):
+    """Display name of a fork target ("point_2" -> "Companion"), "—" for None."""
+    if not target:
+        return "—"
+    return CABANG_NAMES.get(target, str(target).replace("point_", "CABANG "))
+
+
 # Horn output (-1 = none). HORN_MODE "running": on the whole time AUTO is
 # RUNNING; "moving": only while it is actually driving.
 DO_HORN        = _params["io_mapping"].get("DO_HORN", -1)

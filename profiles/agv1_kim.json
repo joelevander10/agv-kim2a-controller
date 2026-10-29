@@ -2,6 +2,12 @@
   "_agv_id": "agv1_kim",
   "_description": "AGV1 KIM2A — primary unit",
 
+  "cabang_names": {
+    "_comment": "Names shown for the branches (CABANG) on the HOME page and in the log. Branches not listed show as CABANG n.",
+    "point_1": "SCB",
+    "point_2": "Companion"
+  },
+
   "networking": {
     "LOCAL_IP": "192.168.2.100",
     "DIO_IP": "192.168.1.31",
@@ -558,6 +564,18 @@
       "cooldown_s": 3.0,
       "requires_mode": "running",
       "requires_speed": ["MEDIUM"]
+    },
+    {
+      "_comment": "HOMEPOST by marker (same as tag 0000): LEFT and RIGHT marker together, seen without a break for 0.5 s, while at SLOW -> brake and end AUTO (back to ARMED, run log saved); START / G starts the next trip. At HIGH the pair still means HIGH -> MEDIUM (marker_both_medium). Ignored in the first 5 s after START (the AGV may start on the markers). At 0.18 m/s, 0.5 s = 0.09 m, so lay the pair longer than ~0.15 m.",
+      "name": "homepost_marker",
+      "category": "sequence",
+      "trigger": { "type": "marker", "marker_side": "both", "hold_s": 0.5 },
+      "actions": [
+        { "type": "end_run", "ignore_first_s": 5.0 }
+      ],
+      "cooldown_s": 10.0,
+      "requires_mode": "running",
+      "requires_speed": ["SLOW"]
     },
     {
       "_comment": "HOMEPOST (tag 0000): brake and end AUTO there (back to ARMED, run log saved); START / G starts the next trip. Ignored for the first 5 s after START (the AGV may start on this tag). Put a SLOW tag (e.g. 0014) before it so it arrives slowly.",
