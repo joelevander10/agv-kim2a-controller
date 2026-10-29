@@ -92,6 +92,8 @@ async def auto_mode(state, engine=None):
     resync_d             = False  # first frame after a hold: no derivative kick
     blend_from           = None   # gains of the previous speed mode while the speed changes
     marker_hold          = {}     # marker pattern -> [first seen, last seen] (monotonic s)
+    start_pair           = None   # AUTO started ON the homepost marker pair (None = no frame yet)
+    start_pair_last      = 0.0    # last time a marker was seen while leaving that pair
     blend_v0             = 0.0    # speed when the speed mode changed
     frame_t              = None   # perf_counter of the previous sensor frame
 
@@ -249,8 +251,26 @@ async def auto_mode(state, engine=None):
                     await motion.set_forward(state, 0.0)
                     tape_was_lost = False
 
+                # ── Homepost: ignore the marker pair the AGV starts on ────────
+                # START at the homepost sits on the left + right marker pair; it
+                # must NOT count as "pair at HIGH -> MEDIUM". Markers are ignored
+                # until the AGV has driven off it (no marker for MARKER_GAP_S),
+                # then they work as usual.
+                _l0, _r0 = bool(sensor["left_marker"]), bool(sensor["right_marker"])
+                if start_pair is None:
+                    start_pair, start_pair_last = _l0 and _r0, time.monotonic()
+                    if start_pair:
+                        logger.info("[HOME] START on the marker pair — markers ignored "
+                                    "until the AGV has left it (speed %s)", state.speed_mode)
+                elif start_pair:
+                    if _l0 or _r0:
+                        start_pair_last = time.monotonic()
+                    elif time.monotonic() - start_pair_last > MARKER_GAP_S:
+                        start_pair = False
+                        logger.info("[HOME] left the homepost marker pair — markers active again")
+
                 # ── Marker hook (sequence engine) ──────────────────────────────
-                if engine is not None:
+                if engine is not None and not start_pair:
                     if sensor["left_marker"]:
                         await engine.on_marker("left")
                     if sensor["right_marker"]:
@@ -835,11 +855,20 @@ async def mode_manager(state, engine=None, manager=None):
             if latest_sensor is not None:
                 tape_present = latest_sensor.get("tape_detected", False)
                 await state.sensor_queue.put(latest_sensor)
+            # Starting on the homepost marker pair (left + right together)?
+            # Then the trip starts at HOMEPOST_START_SPEED, whatever the speed
+            # was before (RESET / power-up set HIGH).
+            _on_pair = bool(latest_sensor and latest_sensor.get("left_marker")
+                            and latest_sensor.get("right_marker"))
 
             if not tape_present:
                 logger.warning("START ignored — tape not detected. Place AGV on tape first.")
             else:
-                logger.info("START — launching AUTO mode.")
+                if _on_pair and state.speed_mode != config.HOMEPOST_START_SPEED:
+                    logger.info("[HOME] START on the homepost marker pair — speed %s -> %s",
+                                state.speed_mode, config.HOMEPOST_START_SPEED)
+                    state.speed_mode = config.HOMEPOST_START_SPEED
+                logger.info("START — launching AUTO mode (speed %s).", state.speed_mode)
                 state.end_run_request = None
                 run_started_at     = time.time()
                 active_task        = asyncio.create_task(auto_mode(state, engine=engine))
@@ -896,6 +925,10 @@ async def mode_manager(state, engine=None, manager=None):
                 await _cancel_active()
                 await _flush_and_brake()
                 _reset_sequence_state()
+                # The next trip starts here: use the homepost start speed
+                # (not HIGH) even if the sensor no longer sees the marker pair.
+                state.speed_mode   = config.HOMEPOST_START_SPEED
+                logger.info("[HOME] next START from the homepost at %s", state.speed_mode)
                 current_mode       = "armed"
                 state.current_mode = current_mode
 

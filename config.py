@@ -142,6 +142,12 @@ APPROACH_DECEL_RATE          = _params["speeds"]["APPROACH_DECEL_RATE"]
 ACCEL_RATE_MEDIUM            = _params["speeds"].get("ACCEL_RATE_MEDIUM", ACCEL_RATE)
 ACCEL_RATE_HIGH              = _params["speeds"].get("ACCEL_RATE_HIGH", ACCEL_RATE)
 ACCEL_RATE_MAX               = _params["speeds"].get("ACCEL_RATE_MAX", ACCEL_RATE)
+# Speed mode for the trip that starts at the HOMEPOST: used after AUTO ended
+# there (tag 0000 / marker pair) and whenever START is pressed with the left +
+# right marker pair under the sensor. Missing → "HIGH" (old behaviour).
+HOMEPOST_START_SPEED         = str(_params["speeds"].get("HOMEPOST_START_SPEED", "HIGH")).upper()
+if HOMEPOST_START_SPEED not in ("APPROACH", "SLOW", "MEDIUM", "HIGH", "MAX"):
+    HOMEPOST_START_SPEED = "HIGH"
 
 
 def accel_rate(speed_mode):

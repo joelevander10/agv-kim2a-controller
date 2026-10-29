@@ -84,6 +84,8 @@
     "ACCEL_RATE_MEDIUM": 0.025,
     "ACCEL_RATE_HIGH": 0.025,
     "ACCEL_RATE_MAX": 0.025,
+    "_comment_home_start": "HOMEPOST_START_SPEED: speed mode the trip starts in from the homepost (after AUTO ended there by tag 0000 / marker pair, or START pressed with the left + right marker pair under the sensor). The marker pair the AGV starts on is ignored until the AGV has left it, so it does not drop HIGH to MEDIUM. APPROACH / SLOW / MEDIUM / HIGH / MAX.",
+    "HOMEPOST_START_SPEED": "HIGH",
     "DECEL_RATE": 0.15,
     "APPROACH_DECEL_RATE": 0.02
   },
