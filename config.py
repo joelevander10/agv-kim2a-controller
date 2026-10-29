@@ -75,6 +75,9 @@ DI_PROX        = _params["io_mapping"].get("DI_PROX", -1)
 # RUNNING; "moving": only while it is actually driving.
 DO_HORN        = _params["io_mapping"].get("DO_HORN", -1)
 HORN_MODE      = str(_params["io_mapping"].get("HORN_MODE", "running")).lower()
+# Light output (-1 = none), same modes as the horn.
+DO_LIGHT       = _params["io_mapping"].get("DO_LIGHT", -1)
+LIGHT_MODE     = str(_params["io_mapping"].get("LIGHT_MODE", "running")).lower()
 
 # ── Motor Channels (parameterized — avoids hardcoded DO 0-5 in motion.py) ────
 # Falls back to the hardcoded mapping if the profile doesn't have this section

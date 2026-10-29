@@ -68,7 +68,9 @@ def _build_do_names():
         mc["right"]["do_brake"]: "RIGHT BRAKE",
     }
     if config.DO_HORN >= 0:
-        do_map[config.DO_HORN] = "HORN" 
+        do_map[config.DO_HORN] = "HORN"
+    if config.DO_LIGHT >= 0:
+        do_map[config.DO_LIGHT] = "LIGHT" 
     for idx, label in do_map.items():
         if 0 <= idx < config.NUM_DO:
             names[idx] = label

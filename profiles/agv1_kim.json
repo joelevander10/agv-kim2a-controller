@@ -34,7 +34,10 @@
     "DI_PROX": 8,
     "_comment_horn": "Horn on DO 15: ON while AUTO is RUNNING. HORN_MODE \"running\" = the whole time in RUNNING (also while stopped at a station); \"moving\" = only while driving. -1 = no horn.",
     "DO_HORN": 15,
-    "HORN_MODE": "running"
+    "HORN_MODE": "running",
+    "_comment_light": "Light on DO 14: ON while AUTO is RUNNING (LIGHT_MODE \"running\"), or only while driving (\"moving\"). -1 = no light.",
+    "DO_LIGHT": 14,
+    "LIGHT_MODE": "running"
   },
 
   "motor_channels": {

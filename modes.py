@@ -605,14 +605,15 @@ async def mode_manager(state, engine=None, manager=None):
     run_started_at = 0.0        # time of the last START (homepost tag guard)
 
     while True:
-        # ── Horn (DO_HORN) ────────────────────────────────────────────────
-        # ON while AUTO is RUNNING. HORN_MODE "moving": only while actually
-        # driving (off during station / checkpoint stops). Never in emergency.
+        # ── Horn (DO_HORN) and light (DO_LIGHT) ───────────────────────────
+        # ON while AUTO is RUNNING. Mode "moving": only while actually driving
+        # (off during station / checkpoint stops). Never in emergency.
+        _running = state.current_mode == "running" and not state.emergency_active
+        _moving = _running and not state.sequence_stop and (state.target_speed or 0) > 0.001
         if config.DO_HORN >= 0:
-            horn = state.current_mode == "running" and not state.emergency_active
-            if horn and config.HORN_MODE == "moving":
-                horn = not state.sequence_stop and (state.target_speed or 0) > 0.001
-            state.set_do(config.DO_HORN, horn)
+            state.set_do(config.DO_HORN, _moving if config.HORN_MODE == "moving" else _running)
+        if config.DO_LIGHT >= 0:
+            state.set_do(config.DO_LIGHT, _moving if config.LIGHT_MODE == "moving" else _running)
 
         if state.latest_di is None:
             await asyncio.sleep(0.01)
