@@ -111,6 +111,23 @@ class RFIDReader(SensorDriver):
     def __init__(self):
         super().__init__("RFID TCP")
         self._pass = None          # [tag, reads, first_t, last_t] of the tag in range
+        # Link report (every 60 s while data arrives): bytes received, bytes
+        # that ended up in valid frames, valid frames, tag reads, other frames.
+        self._st = {"rx": 0, "framed": 0, "frames": 0, "tags": 0, "other": 0}
+        self._st_t = 0.0
+        self._other_log_t = 0.0
+
+    def _report(self, now, pending=0):
+        s = self._st
+        if now - self._st_t < 60.0 or s["rx"] == 0:
+            return
+        lost = max(0, s["rx"] - s["framed"] - pending)   # pending = half frame still in buf
+        logger.info("RFID link 60 s: %d tag reads, %d other frames, %d of %d bytes not "
+                    "understood%s", s["tags"], s["other"], lost, s["rx"],
+                    " (reader frames may not match the parser — send this log)" if lost > s["rx"] * 0.05 else "")
+        self._st = {k: 0 for k in s}
+        self._st["rx"] = -pending           # those bytes are counted when they are framed
+        self._st_t = now
 
     # ── Reads per tag pass (diagnostic) ──────────────────────────────────────
     PASS_GAP_S = 1.0               # no read of the tag for this long = pass over
@@ -166,10 +183,19 @@ class RFIDReader(SensorDriver):
                         break
 
                     buf.extend(data)
+                    self._st["rx"] += len(data)
                     for frame in parse_frames(buf):
+                        self._st["framed"] += len(frame)
+                        self._st["frames"] += 1
                         tag = tag_from_frame(frame)
                         if tag is None:
+                            self._st["other"] += 1
+                            t_o = time.monotonic()
+                            if t_o - self._other_log_t > 10.0:     # sample, max 1 per 10 s
+                                self._other_log_t = t_o
+                                logger.info("RFID non-tag frame: %s", frame.hex().upper())
                             continue
+                        self._st["tags"] += 1
                         state.rfid_queue.put_nowait(tag)
                         self._record_rx()
                         # Log a tag once while it stays in range (not every read).
@@ -179,6 +205,7 @@ class RFIDReader(SensorDriver):
                             last_log_t = now
                         last_tag = tag
                         self._count_pass(tag, now)
+                    self._report(time.monotonic(), len(buf))
 
             except Exception as e:
                 logger.warning("RFID connection failed/lost: %s. Retrying in 2s...", e)
