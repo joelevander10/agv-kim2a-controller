@@ -268,6 +268,22 @@ class SequenceEngine:
 
     def _check_preconditions(self, seq: dict, now: float) -> bool:
         """Returns True if the sequence may fire (mode + cooldown checks)."""
+        # Branch gating (CABANG picked on the HMI / keypad):
+        #   trigger "requires_target": point_n -> only when CABANG n is selected
+        #   trigger "unless_target":   point_n -> only when CABANG n is NOT
+        #                                          selected (other one, or none)
+        # e.g. tag 00C1: MEDIUM + left track on SCB's branch, HIGH otherwise.
+        trig = seq.get("trigger", {})
+        target = getattr(self._state, "selected_fork_target", None)
+        if trig.get("requires_target") and trig["requires_target"] != target:
+            logger.debug("[SEQ] '%s' ignored — needs CABANG %s, selected %s",
+                         seq["name"], trig["requires_target"], target)
+            return False
+        if trig.get("unless_target") and trig["unless_target"] == target:
+            logger.debug("[SEQ] '%s' ignored — CABANG %s is selected",
+                         seq["name"], target)
+            return False
+
         required_mode = seq.get("requires_mode")
         if required_mode and self._state.current_mode != required_mode:
             logger.debug("[SEQ] '%s' ignored — mode is '%s', need '%s'",

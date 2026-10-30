@@ -3,18 +3,15 @@ rfid_processor.py — RFID tag dispatcher
 ========================================
 Consumes tags from state.rfid_queue and forwards them to the SequenceEngine.
 
-Fork-target filtering
-----------------------
-Fork sequences ("fork_to_point*") are tagged in the profile JSON with a
-`requires_target` field inside their trigger. These tags are physically read
-on EVERY pass through the loop regardless of which branch the operator wants
-— so before forwarding to the engine, we check the scanned tag's required
-target against state.selected_fork_target (set from the HMI at homepost). If
-it doesn't match, the tag is dropped here and the engine never sees it — no
-change needed in core/sequence_engine.py.
-
-Tags with no `requires_target` (checkpoints, speed zones, trolley sequences,
-the merge-revert tag, etc.) are unaffected and always forwarded as before.
+Fork-target (CABANG) gating
+---------------------------
+Branch tags are read on EVERY pass, whichever branch the operator picked. The
+gating is done per sequence in core/sequence_engine.py (_check_preconditions):
+  trigger "requires_target": point_n  -> only when CABANG n is selected
+  trigger "unless_target":   point_n  -> only when CABANG n is NOT selected
+so one tag can do different things, e.g. 00C1 = MEDIUM + left track when SCB
+(CABANG 1) is selected, HIGH when another branch (or none) is selected.
+All tags are forwarded to the engine.
 
 All sequence behaviour is still defined in the profile JSON under "sequences".
 To add a new action type, add one method to core/sequence_engine.py.
@@ -34,6 +31,8 @@ def _build_target_map():
         trigger = seq.get("trigger", {})
         if trigger.get("type") == "rfid" and "requires_target" in trigger:
             tag_targets[trigger["rfid_tag"]] = trigger["requires_target"]
+        elif trigger.get("type") == "rfid" and "unless_target" in trigger:
+            tag_targets.setdefault(trigger["rfid_tag"], "not " + trigger["unless_target"])
     return tag_targets
 
 
@@ -59,14 +58,6 @@ async def rfid_processor(state, engine):
         # stops) must not change anything underneath it.
         if state.current_mode == "autotune":
             logger.debug("[RFID] Tag %s ignored — auto-tune running", tag)
-            continue
-
-        required_target = tag_targets.get(tag)
-        if required_target is not None and required_target != state.selected_fork_target:
-            logger.debug(
-                "[RFID] Tag %s ignored — requires target '%s', current target is '%s'",
-                tag, required_target, state.selected_fork_target,
-            )
             continue
 
         await engine.on_rfid_tag(tag)

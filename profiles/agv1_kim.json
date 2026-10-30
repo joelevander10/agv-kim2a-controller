@@ -491,6 +491,127 @@
       "requires_mode": "running"
     },
     {
+      "_comment": "Same tag 00C1 when CABANG 1 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point1",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C1", "unless_target": "point_1" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C2 when CABANG 2 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point2",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C2", "unless_target": "point_2" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C3 when CABANG 3 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point3",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C3", "unless_target": "point_3" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C4 when CABANG 4 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point4",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C4", "unless_target": "point_4" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C5 when CABANG 5 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point5",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C5", "unless_target": "point_5" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C6 when CABANG 6 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point6",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C6", "unless_target": "point_6" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C7 when CABANG 7 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point7",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C7", "unless_target": "point_7" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C8 when CABANG 8 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point8",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C8", "unless_target": "point_8" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00C9 when CABANG 9 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point9",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00C9", "unless_target": "point_9" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00CA when CABANG 10 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point10",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00CA", "unless_target": "point_10" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
+      "_comment": "Same tag 00CB when CABANG 11 is NOT the selected branch (another branch, or none selected): HIGH speed only, track unchanged. unless_target = runs for every target except this one.",
+      "name": "branch_high_point11",
+      "category": "navigation",
+      "trigger": { "type": "rfid", "rfid_tag": "00CB", "unless_target": "point_11" },
+      "actions": [
+        { "type": "set_speed", "speed": "HIGH" }
+      ],
+      "cooldown_s": 5.0,
+      "requires_mode": "running"
+    },
+    {
       "_comment": "After the merge back onto the main loop — revert to the default LEFT track. No requires_target: always runs regardless of which point was selected. Tag placeholder: replace 00BB with the scanned tag.",
       "name": "fork_merge_revert",
       "category": "navigation",
